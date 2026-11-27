@@ -4,7 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Дима Крохобор — возврат приложений на iPhone</title>
-<link rel="icon" href="/favicon.png">
+<link rel="icon" type="image/png" sizes="64x64" href="/favicon.png">
+<link rel="icon" type="image/png" sizes="256x256" href="/icon-256.png">
+<link rel="apple-touch-icon" href="/icon-256.png">
 <script>document.documentElement.dataset.theme='dark';try{if(localStorage.getItem('theme')==='light')document.documentElement.dataset.theme='light'}catch(e){}</script>
 <style>
 /*
@@ -1351,13 +1353,18 @@ function renderDetailJobs() {
 }
 
 /* ================= действия ================= */
+// повторные нажатия, пока первое ещё обрабатывается, игнорируем
+const clickBusy = new Set();
+function once(key) { if (clickBusy.has(key)) return false; clickBusy.add(key); setTimeout(() => clickBusy.delete(key), 2500); return true; }
 async function download(id, name, versionId, versionLabel, andInstall, batch) {
   if (!requireLogin()) return;
+  if (!batch && !once('d:' + id + ':' + (versionId || '') + ':' + !!andInstall)) return;
   const body = {ID:id, Name:name, VersionID:versionId||'', VersionLabel:versionLabel||'', Batch:batch||''};
   const dev = readyDevice();
   if (andInstall) { if (!dev) { needPhone(); return; } body.Install = dev; }
   try {
-    await api('/api/download', {json:body});
+    const res = await api('/api/download', {json:body});
+    if (res && res.already) { pollJobs(); toast('Уже в работе: ' + name, 'Прогресс — в «Загрузках» справа сверху', {appId:id, name}); return; }
     if (andInstall) { startInstallFx(id, id, name, '', !!batch); if (!batch) toast('Ставлю на ' + dev.name, name + ': сначала скачаю, потом отправлю на iPhone', {appId:id, name}); }
     else { pollJobs(); toast('Скачиваю: ' + name, 'Прогресс — справа сверху', {appId:id, name}); }
   } catch (err) { toast('Не получилось', err.message, {icon:ICON_ERR, color:'var(--err)'}); }
@@ -1368,7 +1375,9 @@ function needPhone() {
 }
 function quickInstall(id) { const f = (S.lib[id] || [])[0]; if (!f) return; const meta = S.files.find(x => x.file === f) || {}; installFile(f, meta.name || f, meta.minOS || '', id); }
 async function installFile(file, name, minOS, id) {
+  if (!once('i:' + file)) return;
   if (!driverOK()) { showView('home'); toast('Нужен драйвер Apple', 'Кнопка установки — на Главной', {icon:ICON_PHONE, color:'var(--y)'}); return; }
+  toast('Готовлю установку', (name || file) + ': проверяю iPhone…', {appId:id, file, name});
   await pollDevices();
   const ready = S.devices.filter(d => d.trusted);
   if (!ready.length) return needPhone();
@@ -1379,7 +1388,7 @@ async function installFile(file, name, minOS, id) {
 }
 async function install(file, device, minOS, name, id) {
   if (minOS && device.ios !== '?' && verLess(device.ios, minOS) && !confirm(`Этой версии нужна iOS ${minOS}, а на ${device.name} — iOS ${device.ios}. Установка, скорее всего, не получится. Всё равно попробовать?`)) return;
-  try { await api('/api/install', {json:{file, device}}); startInstallFx(id || file, id, name || file, file); toast('Ставлю на ' + device.name, name || file, {appId:id, file, name}); } catch (err) { toast('Не получилось', err.message, {icon:ICON_ERR, color:'var(--err)'}); }
+  try { const res = await api('/api/install', {json:{file, device}}); if (res && res.already) { pollJobs(); toast('Уже ставится на ' + device.name, name || file, {appId:id, file, name}); return; } startInstallFx(id || file, id, name || file, file); toast('Ставлю на ' + device.name, name || file, {appId:id, file, name}); } catch (err) { toast('Не получилось', err.message, {icon:ICON_ERR, color:'var(--err)'}); }
 }
 
 /* ================= «Сохранить удалённое» ================= */

@@ -662,7 +662,7 @@ func (t *Tools) Install(ctx context.Context, d Device, ipa string, c *JobCtl) er
 		state := driverState(dctx)
 		dcancel()
 		if state != "ok" {
-			return errors.New("на компьютере нет драйвера Apple, без него Windows не видит iPhone. Установи его: «iPhone и проверка» → «Установить драйвер Apple»")
+			return errors.New("на компьютере нет драйвера Apple, без него Windows не видит iPhone. Установи его: на Главной кнопка «Установить драйвер Apple»")
 		}
 	}
 	if !d.Trusted {
@@ -671,6 +671,13 @@ func (t *Tools) Install(ctx context.Context, d Device, ipa string, c *JobCtl) er
 	if st, err := os.Stat(ipa); err == nil && d.Free > 0 && d.Free < st.Size()*2 {
 		return fmt.Errorf("на %s мало места: свободно %s, а приложению нужно около %s. Освободи место и попробуй снова", d.Name, mb(d.Free), mb(st.Size()*2))
 	}
+	// на один iPhone ставим по одному приложению: параллельные установки мешают друг другу
+	lk := deviceLock(d.UDID)
+	if !lk.TryLock() {
+		c.Progress(-1, "Жду, пока закончится предыдущая установка на "+d.Name+"…")
+		lk.Lock()
+	}
+	defer lk.Unlock()
 	tmp := filepath.Join(os.TempDir(), fmt.Sprintf("krohobor_%d.ipa", time.Now().UnixNano()))
 	if err := copyFile(ipa, tmp); err != nil {
 		return err
@@ -769,4 +776,11 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	return out.Close()
+}
+
+var devLocks sync.Map
+
+func deviceLock(udid string) *sync.Mutex {
+	m, _ := devLocks.LoadOrStore(udid, &sync.Mutex{})
+	return m.(*sync.Mutex)
 }

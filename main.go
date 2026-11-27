@@ -118,6 +118,18 @@ func (j *Jobs) Start(title string, fn func(c *JobCtl) (string, error)) *Job {
 	return job
 }
 
+// Active — незаконченная задача, подходящая под условие (чтобы повторное нажатие не запускало вторую такую же).
+func (j *Jobs) Active(match func(*Job) bool) *Job {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	for _, job := range j.list {
+		if (job.Status == "running" || job.Status == "queued") && match(job) {
+			return job
+		}
+	}
+	return nil
+}
+
 // Remove убирает законченную задачу из истории; ClearFinished — все законченные.
 func (j *Jobs) Remove(id int) {
 	j.mu.Lock()
@@ -598,6 +610,14 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "неверный ID")
 		return
 	}
+	target := ""
+	if req.Install != nil {
+		target = req.Install.Name
+	}
+	if old := s.jobs.Active(func(j *Job) bool { return j.Kind == "download" && j.AppID == req.ID && j.Target == target }); old != nil && req.VersionID == "" {
+		writeJSON(w, map[string]any{"jobId": old.ID, "already": true})
+		return
+	}
 	job := s.enqueue(req)
 	writeJSON(w, map[string]int{"jobId": job.ID})
 }
@@ -827,6 +847,10 @@ func (s *Server) handleInstall(w http.ResponseWriter, r *http.Request) {
 	path, ok := s.safeIPA(req.File)
 	if !ok {
 		writeErr(w, http.StatusBadRequest, "файл не найден")
+		return
+	}
+	if old := s.jobs.Active(func(j *Job) bool { return j.Kind == "install" && j.File == filepath.Base(path) && j.Target == req.Device.Name }); old != nil {
+		writeJSON(w, map[string]any{"jobId": old.ID, "already": true})
 		return
 	}
 	meta, _ := ReadIPAMeta(path)
