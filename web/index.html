@@ -1683,7 +1683,7 @@ async function sendReport() {
 async function quitApp() {
   if (!confirm('Закрыть программу? Текущие загрузки продолжатся при следующем запуске.')) return;
   await api('/api/quit', {method:'POST'}).catch(()=>{});
-  document.body.innerHTML = '<div class="empty" style="padding-top:30vh"><b>Программа закрыта</b>Эту вкладку можно закрыть.</div>';
+  document.body.innerHTML = '<div class="empty" style="padding-top:30vh"><b>Программа закрыта</b>Это окно можно закрыть.</div>'; setTimeout(() => window.close(), 600);
 }
 
 /* ================= первый запуск: камера ведёт по столу ================= */

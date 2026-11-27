@@ -979,7 +979,7 @@ func tryExisting(cfg string) bool {
 		}
 		return false
 	}
-	_ = openURL(fmt.Sprintf("http://127.0.0.1:%d/?t=%s", in.Port, in.Token))
+	openWindow(fmt.Sprintf("http://127.0.0.1:%d/?t=%s", in.Port, in.Token), cfg)
 	return true
 }
 
@@ -1241,11 +1241,11 @@ func main() {
 	saveInstance(port, s.token)
 	url := fmt.Sprintf("http://127.0.0.1:%d/?t=%s", port, s.token)
 	fmt.Println("Дима Крохобор", AppVersion)
-	fmt.Println("Страница открыта в браузере. Если не открылась — скопируй ссылку:")
+	fmt.Println("Окно программы открыто. Если не открылось — скопируй ссылку в браузер:")
 	fmt.Println(url)
 	fmt.Println("Не закрывай это окно, пока пользуешься программой.")
 	if os.Getenv("KROHOBOR_NO_BROWSER") == "" {
-		_ = openURL(url)
+		openWindow(url, s.cfgDir)
 	}
 	log.Fatal(http.Serve(ln, mux))
 }
