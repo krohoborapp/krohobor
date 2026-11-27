@@ -905,6 +905,16 @@ function openNews() {
   $('newsGh').href = u.url || '#';
   openModal('newsModal');
 }
+// сама проверяет обновления: вскоре после запуска и потом каждые 2 часа, пока программа открыта
+const updToasted = new Set();
+async function autoCheckUpdate() {
+  try {
+    const r = await api('/api/check-update', {method:'POST'});
+    if (r.latest || !r.update) return;
+    S.update = r.update; renderBanners();
+    if (!updToasted.has(r.update.version)) { updToasted.add(r.update.version); toast('Вышла версия ' + r.update.version, 'Сверху — «Что нового» и «Обновить»', {icon:ICON_OK, color:'var(--y)'}); }
+  } catch (e) {}
+}
 async function doUpdate() { try { await api('/api/update', {method:'POST'}); S.update = null; renderBanners(); pollJobs(); } catch (e) { toast('Не получилось обновить', e.message, {icon:ICON_ERR, color:'var(--err)'}); } }
 
 /* ================= навигация ================= */
@@ -1953,6 +1963,7 @@ addEventListener('keydown', e => {
   renderHome();
   await Promise.all([loadCatalog(), loadLib(), pollDevices()]);
   loadSavedPurchases();
+  setTimeout(autoCheckUpdate, 6000); setInterval(autoCheckUpdate, 2 * 3600e3);
   renderAll(); pollJobs();
   if (!S.settings.wizardDone || (S.settings.wizardVer || 0) < 2) openWizard();
   else setTimeout(() => showView('home'), 350);
