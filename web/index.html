@@ -871,13 +871,14 @@ async function doLogin(e, p) {
   try {
     const r = await api('/api/login', {json:{email:$(p + 'Email').value, password:$(p + 'Pass').value, code:$(p + 'Code').value}});
     if (r.ok) { $(p + 'Pass').value = ''; await loadStatus(); S.purchases = null; loadSavedPurchases(); if (p === 'm') { closeModal('loginModal'); renderAll(); } else wizNext(); toast('Вход выполнен', S.account && S.account.email, {icon:ICON_OK, color:'var(--ok)'}); return; }
-    if (r.needCode) { $(p + 'Cred').hidden = true; $(p + 'CodeF').hidden = false; $(p + 'Code').focus(); $(p + 'Msg').innerHTML = '<div class="note">Apple отправила код на твои устройства. Введи его, чтобы закончить вход.</div>'; btn.textContent = 'Подтвердить'; btn.disabled = false; return; }
+    if (r.needCode) { $(p + 'Cred').hidden = true; $(p + 'CodeF').hidden = false; $(p + 'Code').focus(); $(p + 'Msg').innerHTML = '<div class="note">Apple просит код с твоих устройств — введи его, чтобы закончить вход.<br><span style="opacity:.8">Код не пришёл за минуту? Скорее всего, пароль неверный: Apple просит код даже при ошибке в пароле. <a class="lnk" href="#" onclick="event.preventDefault();loginBack(\'' + p + '\')">Проверить пароль</a></span></div>'; btn.textContent = 'Подтвердить'; btn.disabled = false; return; }
     $(p + 'Msg').innerHTML = '<div class="note err">' + esc(r.hint || r.error) + '</div>';
     // не вышло на шаге с кодом — начинаем вход заново: старый код уже не действует
     if (!$(p + 'CodeF').hidden) { $(p + 'Code').value = ''; $(p + 'CodeF').hidden = true; $(p + 'Cred').hidden = false; btn.disabled = false; btn.textContent = 'Войти заново'; return; }
   } catch (err) { $(p + 'Msg').innerHTML = '<div class="note err">' + esc(err.message) + '</div>'; }
   btn.disabled = false; btn.textContent = $(p + 'CodeF').hidden ? 'Войти' : 'Подтвердить';
 }
+function loginBack(p) { $(p + 'Code').value = ''; $(p + 'CodeF').hidden = true; $(p + 'Cred').hidden = false; $(p + 'Msg').innerHTML = ''; $(p + 'Btn').textContent = 'Войти'; $(p + 'Pass').focus(); $(p + 'Pass').select(); }
 async function doLogout() { await api('/api/logout', {method:'POST'}).catch(()=>{}); closeModal('accModal'); S.purchases = null; await loadStatus(); renderAll(); }
 function requireLogin() { if (S.account && S.account.loggedIn) return true; showLogin(); return false; }
 
