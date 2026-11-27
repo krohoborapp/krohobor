@@ -33,6 +33,9 @@ jobs:
     needs: build
     runs-on: macos-latest
     steps:
+      - uses: actions/checkout@v4
+        with: { sparse-checkout: NOTES.md, path: repo }
+      - run: cp repo/NOTES.md NOTES.md
       - uses: actions/download-artifact@v4
         with: { name: dist, path: dist }
       - name: Своё окно и DMG
@@ -48,6 +51,7 @@ jobs:
           target_commitish: ${{ github.sha }}
           name: Дима Крохобор ${{ needs.build.outputs.ver }}
           draft: true
+          body_path: NOTES.md
           files: |
             dist/*.dmg
             dist/*-windows.zip

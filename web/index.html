@@ -391,6 +391,8 @@ h2{margin:0;font:750 27px/1.15 var(--disp);letter-spacing:-.5px}
 #desk.dragging,body.swiping{user-select:none;-webkit-user-select:none}
 .hrow,.edge,.nav,.chip,.seg,.btn,.act,.tile{user-select:none;-webkit-user-select:none}
 .edge{position:fixed;z-index:8;display:flex;align-items:center;gap:0;height:44px;min-width:44px;padding:0 14px;border-radius:999px;font-weight:700;font-size:13.5px;color:var(--text);opacity:.86;transition:opacity .2s,transform .2s,gap .2s}
+.news{max-height:52vh;overflow:auto;font-size:14.5px;line-height:1.55;color:var(--muted);margin:4px 0 8px}
+.news b,.news h4{color:var(--text)}.news h4{font-size:15px;margin:12px 0 4px}.news p{margin:0 0 8px}.news ul{margin:0 0 10px;padding-left:20px}.news li{margin:3px 0}
 .seg{display:inline-flex;padding:4px;gap:4px;border-radius:14px;background:var(--card2)}
 .seg button{padding:9px 16px;border-radius:10px;font-weight:700;font-size:14px;color:var(--muted);transition:background .15s,color .15s}
 .seg button:hover:not(:disabled){color:var(--text)}
@@ -605,6 +607,10 @@ body.wizard #menu,body.wizard #top,body.wizard #dl,body.wizard #dlBtn,body.wizar
 <div class="veil" id="freshModal"><div class="sheet wide">
   <h3>Новые маскировки</h3><p class="lede">Поставь их на iPhone из App Store, пока их не удалили, — тогда они навсегда останутся в твоих покупках, и программа сможет вернуть их в любой момент.</p>
   <div id="freshList"></div><div class="acts2"><a class="btn tg" id="freshTg" target="_blank" rel="noopener">Подробнее в канале</a><button class="btn ghost" onclick="dismissFresh()">Понятно</button></div></div></div>
+
+<div class="veil" id="newsModal"><div class="sheet wide">
+  <h3 id="newsT"></h3><div class="news" id="newsBody"></div>
+  <div class="acts2"><a class="lnk" id="newsGh" target="_blank" rel="noopener" style="margin-right:auto;align-self:center">Страница версии на GitHub</a><button class="btn ghost" onclick="closeModal('newsModal')">Позже</button><button class="btn" onclick="closeModal('newsModal');doUpdate()">Обновить</button></div></div></div>
 
 <script>
 /* ================= основа ================= */
@@ -835,7 +841,7 @@ function renderBanners() {
   let html = '';
   if (S.translocated) html += `<div class="banner float drv" style="position:static"><span class="grow"><b>Перенеси программу в «Программы».</b> Сейчас она запущена прямо из архива или «Загрузок», и macOS держит её во временной папке — из-за этого не сработает обновление. Закрой программу, перетащи «Дима Крохобор» в папку «Программы» в Finder и запускай оттуда.</span></div>`;
   if (S.toolError) html += `<div class="banner float note err" style="position:static">${esc(S.toolError)}</div>`;
-  if (S.update) html += `<div class="banner float" style="position:static"><span class="grow">Вышла версия <b>${esc(S.update.version)}</b>. Обнови программу, чтобы всё работало как надо.</span><a class="btn ghost sm" href="${esc(S.update.url || '#')}" target="_blank" rel="noopener">Что нового</a><button class="btn sm" onclick="doUpdate()">Обновить</button></div>`;
+  if (S.update) html += `<div class="banner float" style="position:static"><span class="grow">Вышла версия <b>${esc(S.update.version)}</b>. Обнови программу, чтобы всё работало как надо.</span><button class="btn ghost sm" onclick="openNews()">Что нового</button><button class="btn sm" onclick="doUpdate()">Обновить</button></div>`;
   if (!driverOK() && S.settings.wizardDone) html += `<div class="banner float drv" style="position:static"><span class="grow"><b>Нужен драйвер Apple.</b> Без него Windows не видит iPhone.</span><button class="btn sm" onclick="installDriver()">Установить драйвер Apple</button></div>`;
   if (S.fresh.length) html += `<div class="banner float" style="position:static"><span class="grow"><b>${S.fresh.length === 1 ? 'Новая маскировка' : 'Новые маскировки'}:</b> ${esc(S.fresh.slice(0, 3).map(e => e.brand + (e.store ? ' («' + e.store + '»)' : '')).join(', '))}${S.fresh.length > 3 ? ' и ещё ' + (S.fresh.length - 3) : ''}</span><button class="btn sm" onclick="openFresh()">Посмотреть</button><a class="btn tg sm" href="${esc(S.channel)}" target="_blank" rel="noopener">Подробнее в канале</a></div>`;
   const changed = $('banners').innerHTML !== html; $('banners').innerHTML = html;
@@ -877,6 +883,26 @@ async function checkUpdates(btn) {
   if (btn) btn.textContent = 'Проверяю…';
   try { const r = await api('/api/check-update', {method:'POST'}); if (r.latest) { if (btn) btn.textContent = 'Последняя версия ✓'; } else { S.update = r.update; renderBanners(); if (btn) btn.textContent = 'Есть обновление'; } }
   catch (e) { if (btn) btn.textContent = 'Не удалось проверить'; }
+}
+// описание версии с GitHub — прямо в программе: **жирный**, списки «- », абзацы
+function mdLite(t) {
+  const inl = x => esc(x).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  let html = '', list = false;
+  for (const raw of String(t || '').replace(/\r/g, '').split('\n')) {
+    const l = raw.trim();
+    if (/^[-*•]\s+/.test(l)) { if (!list) { html += '<ul>'; list = true; } html += '<li>' + inl(l.replace(/^[-*•]\s+/, '')) + '</li>'; continue; }
+    if (list) { html += '</ul>'; list = false; }
+    if (!l) continue;
+    html += /^#+\s/.test(l) ? '<h4>' + inl(l.replace(/^#+\s/, '')) + '</h4>' : '<p>' + inl(l) + '</p>';
+  }
+  return html + (list ? '</ul>' : '');
+}
+function openNews() {
+  const u = S.update || {};
+  $('newsT').textContent = 'Что нового в версии ' + (u.version || '');
+  $('newsBody').innerHTML = u.notes ? mdLite(u.notes) : '<p>Исправления и улучшения. Подробности — на странице версии.</p>';
+  $('newsGh').href = u.url || '#';
+  openModal('newsModal');
 }
 async function doUpdate() { try { await api('/api/update', {method:'POST'}); S.update = null; renderBanners(); pollJobs(); } catch (e) { toast('Не получилось обновить', e.message, {icon:ICON_ERR, color:'var(--err)'}); } }
 
