@@ -20,21 +20,22 @@ def go_build(goos, goarch, out):
 
 
 def fat_macho(slices, out):
-    """Универсальный Mach-O (как lipo): arm64 + x86_64 в одном файле."""
-    CPU = {"arm64": (0x0100000C, 0), "amd64": (0x01000007, 3)}
-    align = 14
-    datas = [(CPU[a], open(p, "rb").read()) for a, p in slices]
-    header = struct.pack(">II", 0xCAFEBABE, len(datas))
-    offset = (8 + 20 * len(datas) + (1 << align) - 1) & ~((1 << align) - 1)
-    entries, body = b"", b""
-    cur = offset
-    for (cpu, sub), data in datas:
-        entries += struct.pack(">iiIII", cpu, sub, cur, len(data), align)
-        pad = ((cur + len(data) + (1 << align) - 1) & ~((1 << align) - 1)) - (cur + len(data))
-        body += data + b"\0" * pad
-        cur += len(data) + pad
+    """Универсальный Mach-O, как его делает lipo: x86_64 (выравнивание 2^12), затем arm64 (2^14),
+    без хвоста после последней части — иначе codesign ругается «failed strict validation»."""
+    CPU = {"arm64": (0x0100000C, 0, 14), "amd64": (0x01000007, 3, 12)}
+    datas = sorted([(CPU[a], open(p, "rb").read()) for a, p in slices], key=lambda x: x[0][2])
+    head = 8 + 20 * len(datas)
+    up = lambda n, a: (n + (1 << a) - 1) & ~((1 << a) - 1)
+    entries, cur, layout = b"", head, []
+    for (cpu, sub, al), data in datas:
+        cur = up(cur, al); layout.append((cur, data))
+        entries += struct.pack(">iiIII", cpu, sub, cur, len(data), al)
+        cur += len(data)
+    buf = bytearray(cur)
+    buf[0:head] = struct.pack(">II", 0xCAFEBABE, len(datas)) + entries
+    for off, data in layout: buf[off:off + len(data)] = data
     with open(out, "wb") as f:
-        f.write(header + entries + b"\0" * (offset - 8 - 20 * len(datas)) + body)
+        f.write(bytes(buf))
     os.chmod(out, 0o755)
 
 
@@ -115,7 +116,12 @@ APP="{NAME}.app"
 echo "Подписываю приложение (бесплатная подпись без аккаунта разработчика)…"
 chmod +x "$APP/Contents/MacOS/"* "$APP/Contents/Resources/MainApp/"*/*
 xattr -cr "$APP"
-codesign --force --deep --sign - "$APP" || exit 1
+if ! codesign --force --deep --sign - "$APP"; then
+  echo "Пересобираю универсальный файл системным lipo и пробую ещё раз…"
+  BIN="$APP/Contents/MacOS/dimakrohobor"; T=$(mktemp -d)
+  lipo "$BIN" -thin x86_64 -output "$T/x" && lipo "$BIN" -thin arm64 -output "$T/a" && lipo -create "$T/x" "$T/a" -output "$BIN" && chmod +x "$BIN"
+  codesign --force --deep --sign - "$APP" || exit 1
+fi
 echo "Собираю архив для обновлений…"
 rm -f "{SLUG}-{VER}-mac.zip"
 ditto -c -k --keepParent "$APP" "{SLUG}-{VER}-mac.zip"
