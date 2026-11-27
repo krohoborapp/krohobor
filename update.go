@@ -1,7 +1,7 @@
 package main
 
 // Проверка обновлений через релизы GitHub и обновление в один клик.
-// Ожидаемые файлы релиза: auto-update-mac.zip (внутри «Дима Крохобор.app»; ищется по окончанию -mac.zip),
+// Ожидаемые файлы релиза: DimaKrohobor-<версия>.dmg (внутри «Дима Крохобор.app»),
 // DimaKrohobor-<версия>-windows.zip и DimaKrohobor-<версия>-linux.zip (внутри папка с программой).
 
 import (
@@ -72,7 +72,7 @@ func newer(a, b string) bool { // a > b
 func assetSuffix() string {
 	switch runtime.GOOS {
 	case "darwin":
-		return "-mac.zip"
+		return ".dmg" // на Mac обновляемся прямо из DMG — того же файла, что качают люди
 	case "windows":
 		return "-windows.zip"
 	}
@@ -158,7 +158,11 @@ func applyUpdate(c *JobCtl) (string, error) {
 	}
 	c.Progress(-1, "Распаковываю…")
 	ex := filepath.Join(tmp, "x")
-	if err := unzip(zipPath, ex); err != nil {
+	if runtime.GOOS == "darwin" {
+		if err := extractDMG(zipPath, ex); err != nil {
+			return "", err
+		}
+	} else if err := unzip(zipPath, ex); err != nil {
 		return "", err
 	}
 	var newExe string
@@ -343,9 +347,6 @@ func checkUpdateByRedirect(ctx context.Context) *Release {
 	}
 	ver := strings.TrimPrefix(tag, "v")
 	name := "DimaKrohobor-" + ver + assetSuffix()
-	if runtime.GOOS == "darwin" {
-		name = "auto-update-mac.zip"
-	}
 	r := &Release{Version: ver, URL: "https://github.com/" + UpdateRepo + "/releases/tag/" + tag,
 		Asset: "https://github.com/" + UpdateRepo + "/releases/download/" + tag + "/" + name}
 	updMu.Lock()
@@ -353,4 +354,23 @@ func checkUpdateByRedirect(ctx context.Context) *Release {
 	updMu.Unlock()
 	logf("доступно обновление %s", r.Version)
 	return r
+}
+
+// extractDMG подключает DMG без показа в Finder, копирует из него программу в dst и отключает.
+func extractDMG(dmg, dst string) error {
+	mnt := dst + "-mnt"
+	_ = os.MkdirAll(mnt, 0o755)
+	_ = os.MkdirAll(dst, 0o755)
+	if out, err := exec.Command("hdiutil", "attach", "-nobrowse", "-readonly", "-noautoopen", "-mountpoint", mnt, dmg).CombinedOutput(); err != nil {
+		return fmt.Errorf("не открылся файл обновления: %s", strings.TrimSpace(string(out)))
+	}
+	defer exec.Command("hdiutil", "detach", "-force", mnt).Run()
+	apps, _ := filepath.Glob(filepath.Join(mnt, "*.app"))
+	if len(apps) == 0 {
+		return errors.New("в файле обновления нет программы")
+	}
+	if out, err := exec.Command("ditto", apps[0], filepath.Join(dst, filepath.Base(apps[0]))).CombinedOutput(); err != nil {
+		return fmt.Errorf("не скопировалась новая версия: %s", strings.TrimSpace(string(out)))
+	}
+	return nil
 }

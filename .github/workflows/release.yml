@@ -1,5 +1,5 @@
 # Сборка релиза: поменяй номер в файле VERSION — GitHub соберёт архивы для Windows и Linux,
-# DMG и архив обновления для Mac и создаст черновик релиза. Опубликовать — кнопкой на странице Releases.
+# DMG для Mac и создаст черновик релиза. Опубликовать — кнопкой на странице Releases.
 name: Релиз
 on:
   push:
@@ -50,6 +50,5 @@ jobs:
           draft: true
           files: |
             dist/*.dmg
-            dist/*-mac.zip
             dist/*-windows.zip
             dist/*-linux.zip
