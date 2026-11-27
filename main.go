@@ -999,6 +999,7 @@ func saveInstance(port int, token string) {
 func releaseInstance() { _ = os.Remove(instancePath) }
 
 func main() {
+	startupChecks()
 	data, cfg := userDirs()
 	if os.Getenv("KROHOBOR_NO_BROWSER") == "" && tryExisting(cfg) {
 		return
