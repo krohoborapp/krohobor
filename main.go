@@ -283,7 +283,9 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	default:
 		res = s.tools.Login(ctx, email, req.Password, code)
 	}
-	if res.Error != "" {
+	if res.Error != "" && res.Hint != "" {
+		logf("вход не удался: неверный пароль")
+	} else if res.Error != "" {
 		res.Hint = friendly(res.Error)
 		if req.Code != "" && badLoginRe.MatchString(res.Error) {
 			// ipatool на любую неудачу говорит «неверный пароль», но раз код пришёл — пароль Apple уже приняла

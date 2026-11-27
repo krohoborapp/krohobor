@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -73,9 +74,23 @@ func interactiveLoginSupported() bool {
 
 // LoginStart начинает вход. Если Apple просит код — возвращает NeedCode и открытую сессию.
 func (t *Tools) LoginStart(email, password string) (*loginSession, LoginResult) {
+	l, res := t.loginStart(email, password, true)
+	if l == nil && !res.OK && regexp.MustCompile(`(?i)unknown|unrecognized|invalid (option|argument)`).MatchString(res.Error) {
+		return t.loginStart(email, password, false) // старый ipatool без --debug
+	}
+	return l, res
+}
+
+func (t *Tools) loginStart(email, password string, debug bool) (*loginSession, LoginResult) {
 	addSecret(password) // до конца входа: терминал может повторить пароль в выводе
 	go func() { time.Sleep(7 * time.Minute); dropSecret(password) }()
-	wbin, wargs := ttyWrap(t.Ipatool, []string{"auth", "login", "-e", email})
+	// --debug: ipatool показывает ответ Apple целиком — по нему отличаем неверный пароль от запроса кода.
+	// Этот вывод никуда не записывается: в нём служебные данные входа.
+	args := []string{"auth", "login", "-e", email}
+	if debug {
+		args = append(args, "--debug")
+	}
+	wbin, wargs := ttyWrap(t.Ipatool, args)
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute) // на ввод кода — с запасом
 	cmd := t.command(ctx, "", wbin, wargs...)
 	in, err := cmd.StdinPipe()
@@ -118,6 +133,15 @@ func (t *Tools) LoginStart(email, password string) (*loginSession, LoginResult) 
 	_, _ = io.WriteString(in, password+"\n")
 	mark := len(l.text())
 	if l.waitFor(90*time.Second, mark, "2fa code", "auth code", "two-factor") && !l.exited() {
+		// Apple отвечает «BadLogin» и на неверный пароль, и на «нужен код». Разница — в поле failureType:
+		// при запросе кода оно пустое, при неверном пароле заполнено.
+		ft, cm := appleFailure(l.text()[mark:])
+		logf("вход: Apple просит код (failureType=%q, сообщение=%q)", ft, cm)
+		if ft != "" || badPassMsg.MatchString(cm) {
+			l.kill()
+			<-l.done
+			return nil, LoginResult{Error: "Bad login", Hint: "Неверный пароль Apple ID — Apple его не приняла, поэтому и код не пришёл. Проверь раскладку и Caps Lock или войди с этим паролем на icloud.com."}
+		}
 		return l, LoginResult{NeedCode: true}
 	}
 	<-l.done
@@ -155,12 +179,40 @@ func (t *Tools) loginOutcome(email, out string, withCode bool) LoginResult {
 		_, _, _ = t.Run(ctx, "", t.Ipatool, "kbsync", "--refresh")
 		return LoginResult{OK: true}
 	}
-	for _, p := range []string{"Enter password:", "Enter 2FA code:"} {
-		out = strings.ReplaceAll(out, p, "")
+	// в выводе --debug служебные данные входа — показываем только строки с ошибкой
+	var errs []string
+	for _, ln := range strings.Split(out, "\n") {
+		ln = strings.TrimSpace(ln)
+		if reErrLine.MatchString(ln) && len(ln) < 300 {
+			errs = append(errs, ln)
+		}
 	}
-	msg := lastLines(strings.TrimSpace(out), 4)
+	if len(errs) > 3 {
+		errs = errs[len(errs)-3:]
+	}
+	msg := strings.Join(errs, "\n")
 	if msg == "" {
 		msg = "Bad login"
 	}
 	return LoginResult{Error: msg}
+}
+
+var reErrLine = regexp.MustCompile(`(?i)^(error|err\b)|bad login|failed|rejected|unknown|unrecognized`)
+
+var (
+	reFailureType = regexp.MustCompile(`failureType(?:</key>\s*<string>|"\s*[:=]\s*"|\s*[:=]\s*)([^<"\n,}]*)`)
+	reCustomerMsg = regexp.MustCompile(`customerMessage(?:</key>\s*<string>|"\s*[:=]\s*"|\s*[:=]\s*)([^<"\n}]*)`)
+	badPassMsg    = regexp.MustCompile(`(?i)incorrect|неправильн|неверн`)
+)
+
+// appleFailure достаёт из ответа Apple (вывод --debug) последние failureType и customerMessage.
+func appleFailure(out string) (string, string) {
+	last := func(re *regexp.Regexp) string {
+		m := re.FindAllStringSubmatch(out, -1)
+		if len(m) == 0 {
+			return ""
+		}
+		return strings.TrimSpace(m[len(m)-1][1])
+	}
+	return last(reFailureType), last(reCustomerMsg)
 }
