@@ -5,7 +5,15 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sync/atomic"
+	"time"
 )
+
+// Сколько окон программы сейчас открыто (своих, в режиме приложения). Когда последнее закрыли —
+// программа завершается сама (если ничего не качается): на Windows у неё больше нет окна командной строки,
+// и иначе она осталась бы висеть в фоне.
+var openWindows atomic.Int32
+var onLastWindowClosed = func() {}
 
 // Отдельное окно программы: интерфейс открывается в Chrome, Edge, Яндекс Браузере,
 // Brave или Chromium в режиме приложения — без вкладок, адресной строки и закладок.
@@ -19,7 +27,21 @@ func openWindow(url, cfgDir string) {
 				"--window-size=1400,900",
 				"--no-first-run", "--no-default-browser-check",
 			}
-			if err := exec.Command(bin, args...).Start(); err == nil {
+			cmd := exec.Command(bin, args...)
+			if err := cmd.Start(); err == nil {
+				start := time.Now()
+				openWindows.Add(1)
+				go func() {
+					_ = cmd.Wait()
+					// процесс, который сразу вышел, просто передал окно уже открытому браузеру — это не закрытие
+					if time.Since(start) < 4*time.Second {
+						openWindows.Add(-1)
+						return
+					}
+					if openWindows.Add(-1) == 0 {
+						onLastWindowClosed()
+					}
+				}()
 				return
 			}
 		}

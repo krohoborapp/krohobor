@@ -16,7 +16,8 @@ SLUG = "DimaKrohobor"
 
 def go_build(goos, goarch, out):
     env = dict(os.environ, GOOS=goos, GOARCH=goarch, CGO_ENABLED="0")
-    subprocess.check_call(["go", "build", "-trimpath", "-ldflags", f"-s -w -X main.AppVersion={VER}", "-o", out, "."], cwd=ROOT, env=env)
+    gui = " -H windowsgui" if goos == "windows" else ""  # на Windows без чёрного окна командной строки
+    subprocess.check_call(["go", "build", "-trimpath", "-ldflags", f"-s -w{gui} -X main.AppVersion={VER}", "-o", out, "."], cwd=ROOT, env=env)
 
 
 def fat_macho(slices, out):

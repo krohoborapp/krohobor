@@ -400,7 +400,8 @@ h2{margin:0;font:750 27px/1.15 var(--disp);letter-spacing:-.5px}
 .seg button:disabled{cursor:default}
 .seg button:disabled:not(.on){opacity:.5}
 .edge span{max-width:0;overflow:hidden;white-space:nowrap;transition:max-width .25s}
-.edge:hover,.edge.open{gap:8px}.edge:hover span,.edge.open span,.edge:focus-visible span{max-width:220px}
+.edge:hover,.edge.open,#eU,#eD{gap:8px}.edge:hover span,.edge.open span,.edge:focus-visible span,#eU span,#eD span{max-width:220px}
+#eU,#eD{box-shadow:var(--shadow),inset 0 0 0 1.5px var(--line);opacity:.95}
 .edge:hover{opacity:1}
 .edge svg{width:16px;height:16px}
 #eL{left:296px;top:50%;transform:translateY(-50%)}#eL:hover{transform:translateY(-50%) translateX(-3px)}
@@ -1571,6 +1572,8 @@ async function pollJobs() {
     const first = !primed; S.seen.add(j.id);
     if (j.status === 'done' && j.kind === 'download') libChanged = true;
     if (j.target && primed) onInstallFinished(j);
+    // программа перезапускается новой версией и откроет новое окно — старое закрываем (на Mac окно своё, оно закроется само)
+    if (j.title === 'Обновление программы' && j.status === 'done' && S.os !== 'darwin') { toast('Обновлено', 'Программа перезапускается — окно откроется заново', {icon:ICON_OK, color:'var(--ok)'}); setTimeout(() => window.close(), 400); }
     if (j.title === 'Установка драйвера iPhone') loadStatus().then(() => { renderHome(); renderDevList(); if (S.wiz) renderWizard(); });
     if (first) return;
     const nm = j.title.replace(/^(Загрузка|Установка): /, '');

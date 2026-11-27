@@ -33,6 +33,7 @@ var AppVersion = "1.0.0" // задаётся при сборке релиза: -
 var webFS embed.FS
 
 type Server struct {
+	pageURL string // адрес страницы с токеном — для повторного открытия окна
 	base    string
 	files   string
 	apps    string
@@ -1010,6 +1011,17 @@ func tryExisting(cfg string) bool {
 		return false
 	}
 	u := fmt.Sprintf("http://127.0.0.1:%d/?t=%s", in.Port, in.Token)
+	if !hostMode() {
+		// окно открывает уже работающая программа — она и следит, когда его закроют
+		q, _ := http.NewRequest("POST", fmt.Sprintf("http://127.0.0.1:%d/api/show-window", in.Port), nil)
+		q.Header.Set("X-Token", in.Token)
+		if r, err := (&http.Client{Timeout: 3 * time.Second}).Do(q); err == nil {
+			r.Body.Close()
+			if r.StatusCode == 200 {
+				return true
+			}
+		}
+	}
 	if hostMode() {
 		fmt.Println("ATTACH: " + u) // своё окно на Mac подключится к уже работающей программе
 	} else {
@@ -1114,13 +1126,17 @@ func main() {
 		"/api/list":            s.handleList,
 		"/api/purchases":       s.handlePurchases,
 		"/api/purchases-saved": s.handlePurchasesSaved,
-		"/api/versions":        s.handleVersions,
-		"/api/version":         s.handleVersionMeta,
-		"/api/download":        s.handleDownload,
-		"/api/files":           s.handleFiles,
-		"/api/devices":         s.handleDevices,
-		"/api/install":         s.handleInstall,
-		"/api/open-folder":     s.handleOpenFolder,
+		"/api/show-window": func(w http.ResponseWriter, r *http.Request) {
+			openWindow(s.pageURL, s.cfgDir)
+			writeJSON(w, map[string]bool{"ok": true})
+		},
+		"/api/versions":    s.handleVersions,
+		"/api/version":     s.handleVersionMeta,
+		"/api/download":    s.handleDownload,
+		"/api/files":       s.handleFiles,
+		"/api/devices":     s.handleDevices,
+		"/api/install":     s.handleInstall,
+		"/api/open-folder": s.handleOpenFolder,
 		"/api/icons": func(w http.ResponseWriter, r *http.Request) {
 			var ids []string
 			for _, id := range strings.Split(r.URL.Query().Get("ids"), ",") {
@@ -1280,6 +1296,18 @@ func main() {
 	port := ln.Addr().(*net.TCPAddr).Port
 	saveInstance(port, s.token)
 	url := fmt.Sprintf("http://127.0.0.1:%d/?t=%s", port, s.token)
+	s.pageURL = url
+	onLastWindowClosed = func() {
+		time.Sleep(2 * time.Second) // вдруг окно просто перезапускается
+		for openWindows.Load() == 0 {
+			if s.jobs.Active(func(*Job) bool { return true }) == nil {
+				logf("окно программы закрыто — завершаюсь")
+				releaseInstance()
+				os.Exit(0)
+			}
+			time.Sleep(3 * time.Second) // сначала докачаем и доставим то, что начато
+		}
+	}
 	fmt.Println("Дима Крохобор", AppVersion)
 	fmt.Println("Окно программы открыто. Если не открылось — скопируй ссылку в браузер:")
 	fmt.Println(url)
