@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"embed"
 	"encoding/hex"
 	"encoding/json"
@@ -1105,20 +1106,21 @@ func main() {
 		"/api/ping": func(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, map[string]interface{}{"ok": true, "version": AppVersion})
 		},
-		"/api/status":      s.handleStatus,
-		"/api/login":       s.handleLogin,
-		"/api/logout":      s.handleLogout,
-		"/api/search":      s.handleSearch,
-		"/api/catalog":     s.handleCatalog,
-		"/api/list":        s.handleList,
-		"/api/purchases":   s.handlePurchases,
-		"/api/versions":    s.handleVersions,
-		"/api/version":     s.handleVersionMeta,
-		"/api/download":    s.handleDownload,
-		"/api/files":       s.handleFiles,
-		"/api/devices":     s.handleDevices,
-		"/api/install":     s.handleInstall,
-		"/api/open-folder": s.handleOpenFolder,
+		"/api/status":          s.handleStatus,
+		"/api/login":           s.handleLogin,
+		"/api/logout":          s.handleLogout,
+		"/api/search":          s.handleSearch,
+		"/api/catalog":         s.handleCatalog,
+		"/api/list":            s.handleList,
+		"/api/purchases":       s.handlePurchases,
+		"/api/purchases-saved": s.handlePurchasesSaved,
+		"/api/versions":        s.handleVersions,
+		"/api/version":         s.handleVersionMeta,
+		"/api/download":        s.handleDownload,
+		"/api/files":           s.handleFiles,
+		"/api/devices":         s.handleDevices,
+		"/api/install":         s.handleInstall,
+		"/api/open-folder":     s.handleOpenFolder,
 		"/api/icons": func(w http.ResponseWriter, r *http.Request) {
 			var ids []string
 			for _, id := range strings.Split(r.URL.Query().Get("ids"), ",") {
@@ -1295,4 +1297,39 @@ func main() {
 		openWindow(url, s.cfgDir)
 	}
 	log.Fatal(http.Serve(ln, mux))
+}
+
+// handlePurchasesSaved — загруженная история покупок хранится на диске (отдельно для каждого Apple ID),
+// чтобы после перезапуска список был сразу, без повторной загрузки.
+func (s *Server) handlePurchasesSaved(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	acc := s.tools.AuthInfo(ctx)
+	if !acc.LoggedIn || acc.Email == "" {
+		writeJSON(w, map[string]any{})
+		return
+	}
+	sum := sha256.Sum256([]byte(strings.ToLower(acc.Email)))
+	path := filepath.Join(s.cfgDir, "purchases-"+hex.EncodeToString(sum[:8])+".json")
+	if r.Method == http.MethodPost {
+		var body struct {
+			Mode string            `json:"mode"`
+			Apps []json.RawMessage `json:"apps"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(nil, r.Body, 16<<20)).Decode(&body); err != nil {
+			writeErr(w, http.StatusBadRequest, "неверные данные")
+			return
+		}
+		data, _ := json.Marshal(map[string]any{"mode": body.Mode, "apps": body.Apps, "saved": time.Now().Unix()})
+		_ = os.WriteFile(path, data, 0o600)
+		writeJSON(w, map[string]bool{"ok": true})
+		return
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		writeJSON(w, map[string]any{})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write(data)
 }

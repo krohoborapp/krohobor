@@ -863,7 +863,7 @@ async function doLogin(e, p) {
   const btn = $(p + 'Btn'); btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Вхожу…'; $(p + 'Msg').innerHTML = '';
   try {
     const r = await api('/api/login', {json:{email:$(p + 'Email').value, password:$(p + 'Pass').value, code:$(p + 'Code').value}});
-    if (r.ok) { $(p + 'Pass').value = ''; await loadStatus(); if (p === 'm') { closeModal('loginModal'); renderAll(); } else wizNext(); toast('Вход выполнен', S.account && S.account.email, {icon:ICON_OK, color:'var(--ok)'}); return; }
+    if (r.ok) { $(p + 'Pass').value = ''; await loadStatus(); S.purchases = null; loadSavedPurchases(); if (p === 'm') { closeModal('loginModal'); renderAll(); } else wizNext(); toast('Вход выполнен', S.account && S.account.email, {icon:ICON_OK, color:'var(--ok)'}); return; }
     if (r.needCode) { $(p + 'Cred').hidden = true; $(p + 'CodeF').hidden = false; $(p + 'Code').focus(); $(p + 'Msg').innerHTML = '<div class="note">Apple отправила код на твои устройства. Введи его, чтобы закончить вход.</div>'; btn.textContent = 'Подтвердить'; btn.disabled = false; return; }
     $(p + 'Msg').innerHTML = '<div class="note err">' + esc(r.hint || r.error) + '</div>';
   } catch (err) { $(p + 'Msg').innerHTML = '<div class="note err">' + esc(err.message) + '</div>'; }
@@ -1158,12 +1158,27 @@ async function doSearch() {
 }
 
 /* ================= Мои покупки ================= */
+// загруженный список хранится у программы: после перезапуска он сразу на месте
+function savePurchases() {
+  if (!S.purchases || !S.purchases.length) return;
+  S.purchSaved = Date.now() / 1000;
+  api('/api/purchases-saved', {json:{mode:S.purchMode, apps:S.purchases}}).catch(() => {});
+}
+async function loadSavedPurchases() {
+  if (!S.account || !S.account.loggedIn || S.purchasesLoading) return;
+  try {
+    const r = await api('/api/purchases-saved');
+    if (!r.apps || !r.apps.length) return;
+    S.purchases = r.apps; S.purchMode = r.mode; S.purchasesAll = r.mode === 'all'; S.purchSaved = r.saved;
+    renderPurchases(); fillInfo(S.purchases.map(a => a.id)).then(renderPurchaseList);
+  } catch (e) {}
+}
 async function loadPurchases(all) {
   if (!requireLogin()) return;
   if (!all) {
     S.purchMode = '90'; S.purchasesLoading = {mode:'90'}; renderPurchases();
     try { S.purchases = (await api('/api/purchases?all=0&refresh=1')).apps; S.purchasesAll = false; } catch (err) { S.purchasesErr = err.message; }
-    S.purchasesLoading = null; await loadDevApps(); renderPurchases();
+    S.purchasesLoading = null; savePurchases(); await loadDevApps(); renderPurchases();
     if (S.purchases) { await fillInfo(S.purchases.map(a => a.id)); renderPurchaseList(); }
     return;
   }
@@ -1187,6 +1202,7 @@ async function loadPurchases(all) {
     try { S.purchases = (await api('/api/purchases?all=1&refresh=1')).apps || []; L.errors = 0; } catch (e) { S.purchasesErr = e.message; }
   }
   S.purchasesAll = !L.stop; S.purchasesLoading = null;
+  if (!L.stop && S.purchases.length) savePurchases();
   toast(L.stop ? 'Загрузка истории остановлена' : 'История загружена', `${S.purchases.length} ${plural(S.purchases.length,'приложение','приложения','приложений')}${L.errors ? `, не загрузились ${L.errors} ${plural(L.errors,'год','года','лет')}` : ''}`, {icon:ICON_OK, color:'var(--ok)'});
   await loadDevApps(); renderPurchases();
   await fillInfo(S.purchases.map(a => a.id)); renderPurchaseList();
@@ -1212,7 +1228,8 @@ function renderPurchases() {
   $('pLede').textContent = 'Всё, что ты когда-либо качал на этот Apple ID. Отсюда возвращаются приложения, которых в магазине уже нет.' + (readyDevice() ? '' : ' Подключи iPhone — увидишь, чего на нём нет.');
   const busy = !!S.purchasesLoading;
   const mode = S.purchasesLoading ? S.purchasesLoading.mode : S.purchases ? S.purchMode : '';
-  $('pTools').innerHTML = `<div class="seg"><button class="${mode === '90' ? 'on' : ''}" onclick="loadPurchases(false)" ${busy ? 'disabled' : ''}>За 90 дней</button><button class="${mode === 'all' ? 'on' : ''}" onclick="loadPurchases(true)" ${busy ? 'disabled' : ''}>Вся история</button></div><input class="field" id="pf" placeholder="Фильтр" oninput="renderPurchaseList()" style="flex:1;max-width:240px">${S.devApps ? '<button class="btn ghost" onclick="updateAllOld()">Обновить всё устаревшее</button>' : ''}<button class="btn ghost" onclick="$('listPick').click()" title="Файл со строками «Название: ID» — например, подборка из канала">Проверить список .txt…</button>`;
+  const savedAt = !S.purchasesLoading && S.purchases && S.purchSaved ? new Date(S.purchSaved * 1000) : null;
+  $('pTools').innerHTML = `<div class="seg"><button class="${mode === '90' ? 'on' : ''}" onclick="loadPurchases(false)" ${busy ? 'disabled' : ''}>За 90 дней</button><button class="${mode === 'all' ? 'on' : ''}" onclick="loadPurchases(true)" ${busy ? 'disabled' : ''}>Вся история</button></div><input class="field" id="pf" placeholder="Фильтр" oninput="renderPurchaseList()" style="flex:1;max-width:240px">${S.devApps ? '<button class="btn ghost" onclick="updateAllOld()">Обновить всё устаревшее</button>' : ''}<button class="btn ghost" onclick="$('listPick').click()" title="Файл со строками «Название: ID» — например, подборка из канала">Проверить список .txt…</button>${savedAt ? `<span style="color:var(--faint);font-size:12.5px;width:100%">Список от ${savedAt.toLocaleDateString('ru-RU')} ${savedAt.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'})}. Купил что-то новое — нажми ещё раз, список обновится.</span>` : ''}`;
   const tabs = S.devApps ? [['all','Все'],['missing','Нет на iPhone'],['on','На iPhone'],['old','Можно обновить'],['gone','Удалённые из App Store']] : [['all','Все'],['gone','Удалённые из App Store']];
   $('pTabs').innerHTML = S.purchases && !(S.purchasesLoading && S.purchasesLoading.mode !== 'all') ? tabs.map(([k, l]) => `<button class="chip ${S.ptab === k ? 'on' : ''}" onclick="S.ptab='${k}';renderPurchases()">${l}</button>`).join('') : '';
   const b = $('pBody');
@@ -1906,6 +1923,7 @@ addEventListener('keydown', e => {
   await loadStatus();
   renderHome();
   await Promise.all([loadCatalog(), loadLib(), pollDevices()]);
+  loadSavedPurchases();
   renderAll(); pollJobs();
   if (!S.settings.wizardDone || (S.settings.wizardVer || 0) < 2) openWizard();
   else setTimeout(() => showView('home'), 350);
