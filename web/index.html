@@ -171,7 +171,9 @@ h2{margin:0;font:750 27px/1.15 var(--disp);letter-spacing:-.5px}
 .hdots i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.35);cursor:pointer}
 .hdots i.on{background:#fff}
 .pgbtn{position:absolute;top:50%;transform:translateY(-50%);width:34px;height:34px;border-radius:50%;background:var(--card);box-shadow:var(--shadow);display:grid;place-items:center;font-size:18px;font-weight:800;color:var(--text);z-index:5}
-.pgbtn.l{left:-48px}.pgbtn.r{right:-48px}
+.pgbtn{top:556px;transform:none;width:30px;height:30px;font-size:17px;background:rgba(255,255,255,.16);color:#fff;box-shadow:none;backdrop-filter:blur(6px)}
+.pgbtn:hover{background:rgba(255,255,255,.28)}
+.pgbtn.l{left:88px}.pgbtn.r{left:202px}
 .wifi{position:absolute;left:50%;top:628px;transform:translateX(-50%) rotate(180deg);width:110px;height:82px;opacity:0;transition:opacity .4s}
 .phone-wrap.net .wifi{opacity:1}
 .phone-wrap.net .cable{opacity:0}
@@ -382,12 +384,22 @@ h2{margin:0;font:750 27px/1.15 var(--disp);letter-spacing:-.5px}
 #desk.dragging{cursor:grabbing}
 #desk.dragging .block{pointer-events:none}
 .block:not(.far){cursor:auto}
-.edge{position:fixed;z-index:8;display:flex;align-items:center;gap:8px;padding:9px 14px;border-radius:999px;font-weight:700;font-size:13.5px;color:var(--text);opacity:.86;transition:opacity .2s,transform .2s}
+#desk.cangrab,#desk.cangrab *{cursor:grab}
+#desk.dragging,#desk.dragging *{cursor:grabbing!important}
+.edge{position:fixed;z-index:8;display:flex;align-items:center;gap:0;height:44px;min-width:44px;padding:0 14px;border-radius:999px;font-weight:700;font-size:13.5px;color:var(--text);opacity:.86;transition:opacity .2s,transform .2s,gap .2s}
+.seg{display:inline-flex;padding:4px;gap:4px;border-radius:14px;background:var(--card2)}
+.seg button{padding:9px 16px;border-radius:10px;font-weight:700;font-size:14px;color:var(--muted);transition:background .15s,color .15s}
+.seg button:hover:not(:disabled){color:var(--text)}
+.seg button.on{background:var(--y);color:var(--ink)}
+.seg button:disabled{cursor:default}
+.seg button:disabled:not(.on){opacity:.5}
+.edge span{max-width:0;overflow:hidden;white-space:nowrap;transition:max-width .25s}
+.edge:hover{gap:8px}.edge:hover span,.edge:focus-visible span{max-width:200px}
 .edge:hover{opacity:1}
 .edge svg{width:16px;height:16px}
-#eL{left:300px;top:50%;transform:translateY(-50%)}#eL:hover{transform:translateY(-50%) translateX(-3px)}
+#eL{left:296px;top:50%;transform:translateY(-50%)}#eL:hover{transform:translateY(-50%) translateX(-3px)}
 #eR{right:20px;top:50%;transform:translateY(-50%)}#eR:hover{transform:translateY(-50%) translateX(3px)}
-#eU{top:84px;left:calc(50% + 140px);transform:translateX(-50%)}#eU:hover{transform:translateX(-50%) translateY(-3px)}
+#eU{top:80px;left:calc(50% + 140px);transform:translateX(-50%)}#eU:hover{transform:translateX(-50%) translateY(-3px)}
 #eD{bottom:20px;left:calc(50% + 140px);transform:translateX(-50%)}#eD:hover{transform:translateX(-50%) translateY(3px)}
 body.wizard .edge{display:none}
 @media (max-width:980px){#eL{left:20px}#eU,#eD{left:50%}}
@@ -651,10 +663,10 @@ const BL = ['device','home','catalog','purchases','library','detail'];
 let pos = {}, cam = {x:0, y:0, s:1}, anim = null, wizMode = false;
 function safeArea() {
   const W = innerWidth, H = innerHeight;
-  let left = W > 980 ? 300 : 20, right = 20;
-  if (wizMode) left = W > 980 ? 480 : 20;
-  const bottom = wizMode && W <= 980 ? 300 : 24;
-  const top = 84 + (wizMode ? 0 : ($('banners').offsetHeight ? $('banners').offsetHeight + 12 : 0));
+  let left = W > 980 ? 352 : 20, right = W > 980 ? 72 : 20;
+  if (wizMode) { left = W > 980 ? 480 : 20; right = 20; }
+  const bottom = wizMode && W <= 980 ? 300 : (wizMode ? 24 : 72);
+  const top = (wizMode ? 84 : 132) + (wizMode ? 0 : ($('banners').offsetHeight ? $('banners').offsetHeight + 12 : 0));
   return {x:left, y:top, w:Math.max(320, W - left - right), h:Math.max(300, H - top - bottom)};
 }
 function layout() {
@@ -1093,11 +1105,27 @@ function renderSearchRes() {
   const r = S.searchRes || [], box = $('sres');
   const special = a => { const inf = S.info[a.id]; return !!a.storeAs || (inf && inf.known && !inf.inStore) || ((a.source === 'catalog' || a.source === 'list' || a.source === 'custom') && !(inf && inf.known && inf.inStore)); };
   const row = a => `<div class="row" onclick="$('sres').hidden=true;openApp(${js(a.id)}, ${js(a.name)}, 'search')">${iconHTML(a.id, a.brand || a.name, {dot:true})}<div class="nm"><b>${esc(a.brand || a.name)}</b><span>${a.storeAs ? 'В App Store: «' + esc(a.storeAs) + '»' : a.category ? esc(a.category) : 'App Store'}</span></div>${actionBtn(a.id, a.name, true)}</div>`;
-  const g1 = r.filter(special), g2 = r.filter(a => !special(a));
+  // все версии одного приложения из каталога (оригинал и маскировки) — одной строкой
+  const brandOf = {}; (S.catalog ? S.catalog.brands : []).forEach((b, i) => b.apps.forEach(x => brandOf[x.id] = i));
+  const items = [], byBrand = {};
+  for (const a of r) {
+    const bi = brandOf[a.id];
+    if (bi === undefined || S.catalog.brands[bi].apps.length < 2) { items.push(a); continue; }
+    if (byBrand[bi]) { byBrand[bi].hits.push(a); continue; }
+    items.push(byBrand[bi] = {group:true, bi, b:S.catalog.brands[bi], hits:[a]});
+  }
+  const brandRow = g => {
+    const b = g.b, n = b.apps.length, q = norm($('q').value || ''), first = b.apps[0];
+    const byMask = !norm(b.brand).includes(q) && g.hits.find(h => h.storeAs && norm(h.storeAs).includes(q));
+    const pick = byMask ? byMask.id : first.id;
+    return `<div class="row" onclick="$('sres').hidden=true;openBrand(${g.bi}, ${js(pick)}, 'search')">${iconHTML(first.id, b.brand, {dot:true})}<div class="nm"><b>${esc(b.brand)}</b><span>${n} ${plural(n,'версия','версии','версий')}${byMask ? ' · нашлось по «' + esc(byMask.storeAs) + '»' : ' · ' + esc(b.category)}</span></div><button class="btn ghost sm" onclick="event.stopPropagation();$('sres').hidden=true;openBrand(${g.bi}, ${js(pick)}, 'search')">Выбрать версию</button></div>`;
+  };
+  const rowAny = x => x.group ? brandRow(x) : row(x);
+  const g1 = items.filter(x => x.group || special(x)), g2 = items.filter(x => !x.group && !special(x));
   const head = t => `<div class="shint" style="font-weight:650;color:var(--faint)">${t}</div>`;
   box.innerHTML = (r.length ? '' : '<div class="shint">Ничего не нашлось. Попробуй другое написание или вставь ссылку из App Store: зажми иконку на iPhone → «Поделиться».</div>')
-    + (g1.length ? head('Удалённые из App Store и маскировки') + g1.map(row).join('') : '')
-    + (g2.length ? head('Есть в App Store') + g2.map(row).join('') : '')
+    + (g1.length ? head('Удалённые из App Store и маскировки') + g1.map(rowAny).join('') : '')
+    + (g2.length ? head('Есть в App Store') + g2.map(rowAny).join('') : '')
     + (r.length ? `<div class="shint" style="display:flex;gap:14px;flex-wrap:wrap">${legendHTML.replace(/<span>/g,'<span style="white-space:nowrap">')}</div>` : '');
 }
 async function doSearch() {
@@ -1114,7 +1142,7 @@ async function doSearch() {
 async function loadPurchases(all) {
   if (!requireLogin()) return;
   if (!all) {
-    S.purchasesLoading = {mode:'90'}; renderPurchases();
+    S.purchMode = '90'; S.purchasesLoading = {mode:'90'}; renderPurchases();
     try { S.purchases = (await api('/api/purchases?all=0&refresh=1')).apps; S.purchasesAll = false; } catch (err) { S.purchasesErr = err.message; }
     S.purchasesLoading = null; await loadDevApps(); renderPurchases();
     if (S.purchases) { await fillInfo(S.purchases.map(a => a.id)); renderPurchaseList(); }
@@ -1122,6 +1150,7 @@ async function loadPurchases(all) {
   }
   // полная история — по годам, чтобы было видно, где идёт загрузка, и список рос на глазах
   const now = new Date().getFullYear(), years = []; for (let y = now; y >= 2008; y--) years.push(y);
+  S.purchMode = 'all';
   const L = S.purchasesLoading = {mode:'all', i:0, n:years.length, year:years[0], found:0, stop:false};
   S.purchases = []; const seen = new Set();
   renderPurchases();
@@ -1163,14 +1192,15 @@ function devState(a) {
 function renderPurchases() {
   $('pLede').textContent = 'Всё, что ты когда-либо качал на этот Apple ID. Отсюда возвращаются приложения, которых в магазине уже нет.' + (readyDevice() ? '' : ' Подключи iPhone — увидишь, чего на нём нет.');
   const busy = !!S.purchasesLoading;
-  $('pTools').innerHTML = `<button class="btn" onclick="loadPurchases(false)" ${busy ? 'disabled' : ''}>За 90 дней</button><button class="btn ghost" onclick="loadPurchases(true)" ${busy ? 'disabled' : ''}>Вся история</button><input class="field" id="pf" placeholder="Фильтр" oninput="renderPurchaseList()" style="flex:1;max-width:240px">${S.devApps ? '<button class="btn ghost" onclick="updateAllOld()">Обновить всё устаревшее</button>' : ''}<button class="btn ghost" onclick="$('listPick').click()" title="Файл со строками «Название: ID» — например, подборка из канала">Проверить список .txt…</button>`;
+  const mode = S.purchasesLoading ? S.purchasesLoading.mode : S.purchases ? S.purchMode : '';
+  $('pTools').innerHTML = `<div class="seg"><button class="${mode === '90' ? 'on' : ''}" onclick="loadPurchases(false)" ${busy ? 'disabled' : ''}>За 90 дней</button><button class="${mode === 'all' ? 'on' : ''}" onclick="loadPurchases(true)" ${busy ? 'disabled' : ''}>Вся история</button></div><input class="field" id="pf" placeholder="Фильтр" oninput="renderPurchaseList()" style="flex:1;max-width:240px">${S.devApps ? '<button class="btn ghost" onclick="updateAllOld()">Обновить всё устаревшее</button>' : ''}<button class="btn ghost" onclick="$('listPick').click()" title="Файл со строками «Название: ID» — например, подборка из канала">Проверить список .txt…</button>`;
   const tabs = S.devApps ? [['all','Все'],['missing','Нет на iPhone'],['on','На iPhone'],['old','Можно обновить'],['gone','Удалённые из App Store']] : [['all','Все'],['gone','Удалённые из App Store']];
   $('pTabs').innerHTML = S.purchases && !(S.purchasesLoading && S.purchasesLoading.mode !== 'all') ? tabs.map(([k, l]) => `<button class="chip ${S.ptab === k ? 'on' : ''}" onclick="S.ptab='${k}';renderPurchases()">${l}</button>`).join('') : '';
   const b = $('pBody');
   if (S.purchasesLoading && S.purchasesLoading.mode === 'all') { b.innerHTML = '<div id="pProg"></div><div id="pList"></div>'; renderPurchProgress(); renderPurchaseList(); }
   else if (S.purchasesLoading) b.innerHTML = '<div class="empty"><span class="spin"></span> Загружаю историю за 90 дней…</div>';
   else if (S.purchasesErr) { b.innerHTML = `<div class="note err">${esc(S.purchasesErr)}</div>`; S.purchasesErr = null; }
-  else if (!S.purchases) b.innerHTML = `<div class="empty"><b>История пока не загружена</b>${S.account && S.account.loggedIn ? 'Нажми «За 90 дней». Полная история грузится пару минут.' : 'Сначала войди в Apple ID — слева внизу.'}</div>`;
+  else if (!S.purchases) b.innerHTML = `<div class="empty"><b>История пока не загружена</b>${S.account && S.account.loggedIn ? 'Выбери сверху: «За 90 дней» — быстро, «Вся история» — пару минут.' : 'Сначала войди в Apple ID — слева внизу.'}</div>`;
   else { b.innerHTML = '<div id="pList"></div>'; renderPurchaseList(); }
 }
 function renderPurchaseList() {
@@ -1242,7 +1272,11 @@ async function reloadLists() {
 }
 
 /* ================= карточка приложения: камера подлетает ================= */
-function openBrand(i) { const b = S.catalog.brands[i]; S.detail = {brand:b.brand, variants:b.apps, id:b.apps[0].id, name:b.apps[0].name, store:b.apps[0].store, versions:null, verSel:'', meta:{}}; openDetail('catalog'); }
+function openBrand(i, pickId, from) {
+  const b = S.catalog.brands[i], v = b.apps.find(x => x.id === pickId) || b.apps[0];
+  S.detail = {brand:b.brand, variants:b.apps, id:v.id, name:v.name, store:v.store, versions:null, verSel:'', meta:{}};
+  openDetail(from || 'catalog');
+}
 function openApp(id, name, from) {
   const p = /^(.*?)\s*\((.*)\)\s*$/.exec(name || '');
   S.detail = {brand:p ? p[1] : name, variants:null, id, name, store:p && p[2] !== 'Оригинал' ? p[2] : '', versions:null, verSel:'', meta:{}};
@@ -1751,7 +1785,7 @@ const NAMES = {home:'Главная', catalog:'Каталог', purchases:'Мо�
 function renderEdges() {
   const n = S.view === 'detail' ? {} : (NEIGH[S.view] || {});
   $('allBtn').classList.toggle('on', S.view === 'all');
-  $('eU').style.top = safeArea().y + 'px';
+  $('eU').style.top = (safeArea().y - (innerWidth > 980 ? 52 : 0)) + 'px';
   for (const d of ['L','R','U','D']) { const b = $('e' + d); b.hidden = !n[d]; if (n[d]) { b.querySelector('span').textContent = NAMES[n[d]]; b.title = `Перейти: «${NAMES[n[d]]}». Можно и стрелкой ${{L:'←', R:'→', U:'↑', D:'↓'}[d]} на клавиатуре`; } }
 }
 function edgeGo(d) { const to = (NEIGH[S.view] || {})[d]; if (to) showView(to); }
@@ -1765,9 +1799,17 @@ function magnet(ms) {
   showView(best, ms);
 }
 let drag = null, justDragged = false;
+const INTERACT = 'button,a,input,textarea,select,label,summary,details,.app,.row,.hcard,.act,.tgcard,.chip,.field,.qtip,.note,.legend,[onclick],[contenteditable]';
+// за что можно тянуть стол: дальние блоки, пустые места Главной (и сам телефон), фон любого блока
+function grabbable(t) {
+  const blk = t.closest('.block'); if (!blk || blk.classList.contains('far')) return true;
+  if (t.closest(INTERACT)) return false;
+  return blk.id === 'b-home' || t === blk || t.classList.contains('panel');
+}
+$('desk').addEventListener('pointermove', e => { if (!drag) $('desk').classList.toggle('cangrab', !wizMode && grabbable(e.target)); });
 $('desk').addEventListener('pointerdown', e => {
   if (e.button !== 0 || wizMode) return;
-  const blk = e.target.closest('.block'); if (blk && !blk.classList.contains('far')) return;
+  if (!grabbable(e.target)) return;
   cancelAnimationFrame(anim);
   drag = {x:e.clientX, y:e.clientY, cx:cam.x, cy:cam.y, moved:false, id:e.pointerId};
 });
@@ -1786,7 +1828,7 @@ addEventListener('pointerup', () => {
 let wheelT;
 $('desk').addEventListener('wheel', e => {
   if (wizMode || e.ctrlKey) return;
-  const blk = e.target.closest('.block'); if (blk && !blk.classList.contains('far')) return;
+  const blk = e.target.closest('.block'); if (blk && !blk.classList.contains('far') && blk.id !== 'b-home') return;
   e.preventDefault(); cancelAnimationFrame(anim);
   cam.x -= e.deltaX; cam.y -= e.deltaY; apply();
   clearTimeout(wheelT); wheelT = setTimeout(() => magnet(600), 220);
