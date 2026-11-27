@@ -155,8 +155,10 @@ type hint struct {
 	text string
 }
 
+var badLoginRe = regexp.MustCompile(`(?i)forget your password|incorrect.*password|invalid credentials|bad login`)
+
 var hints = []hint{
-	{regexp.MustCompile(`(?i)forget your password|incorrect.*password|invalid credentials|bad login`), "Неверный пароль Apple ID. Проверь его, войдя на icloud.com. Если код 2FA не приходит, причина обычно тоже в пароле."},
+	{badLoginRe, "Неверный пароль Apple ID. Проверь его, войдя на icloud.com. Если код 2FA не приходит, причина обычно тоже в пароле."},
 	{regexp.MustCompile(`(?i)account is disabled|locked`), "Apple временно заблокировала аккаунт, обычно после нескольких неверных паролей или кодов. Разблокируй его на iPhone или на iforgot.apple.com."},
 	{regexp.MustCompile(`(?i)license is required|item is temporarily unavailable`), "Apple не отдаёт это приложение на твой Apple ID: его не скачивали с этого аккаунта раньше, а в App Store его уже нет. Если оно было на другом твоём Apple ID, войди в него. Если приложение ещё есть в App Store твоего региона, сначала скачай его на iPhone из магазина."},
 	{regexp.MustCompile(`(?i)app not found`), "Приложения больше нет в App Store, и на этом Apple ID его не скачивали. Проверь вкладку «Мои покупки» или войди в другой аккаунт, где оно было."},

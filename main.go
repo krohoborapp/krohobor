@@ -270,6 +270,10 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	res := s.tools.Login(ctx, strings.TrimSpace(req.Email), req.Password, strings.TrimSpace(req.Code))
 	if res.Error != "" {
 		res.Hint = friendly(res.Error)
+		if req.Code != "" && badLoginRe.MatchString(res.Error) {
+			// ipatool на любую неудачу говорит «неверный пароль», но раз код пришёл — пароль Apple уже приняла
+			res.Hint = "Apple не приняла код. Пароль, скорее всего, верный — иначе код бы не пришёл. Обычно дело в том, что код не самый свежий (каждая попытка входа присылает новый, а старый перестаёт действовать) или он устарел — живёт пару минут. Нажми «Войти заново» и сразу введи самый последний код. Если не помогает — подожди 15 минут: после нескольких попыток Apple временно не пускает."
+		}
 		logf("вход не удался: %s", res.Error)
 	} else if res.OK {
 		logf("вход выполнен")

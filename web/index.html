@@ -873,6 +873,8 @@ async function doLogin(e, p) {
     if (r.ok) { $(p + 'Pass').value = ''; await loadStatus(); S.purchases = null; loadSavedPurchases(); if (p === 'm') { closeModal('loginModal'); renderAll(); } else wizNext(); toast('Вход выполнен', S.account && S.account.email, {icon:ICON_OK, color:'var(--ok)'}); return; }
     if (r.needCode) { $(p + 'Cred').hidden = true; $(p + 'CodeF').hidden = false; $(p + 'Code').focus(); $(p + 'Msg').innerHTML = '<div class="note">Apple отправила код на твои устройства. Введи его, чтобы закончить вход.</div>'; btn.textContent = 'Подтвердить'; btn.disabled = false; return; }
     $(p + 'Msg').innerHTML = '<div class="note err">' + esc(r.hint || r.error) + '</div>';
+    // не вышло на шаге с кодом — начинаем вход заново: старый код уже не действует
+    if (!$(p + 'CodeF').hidden) { $(p + 'Code').value = ''; $(p + 'CodeF').hidden = true; $(p + 'Cred').hidden = false; btn.disabled = false; btn.textContent = 'Войти заново'; return; }
   } catch (err) { $(p + 'Msg').innerHTML = '<div class="note err">' + esc(err.message) + '</div>'; }
   btn.disabled = false; btn.textContent = $(p + 'CodeF').hidden ? 'Войти' : 'Подтвердить';
 }
