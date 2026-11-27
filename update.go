@@ -91,7 +91,9 @@ func checkUpdate(ctx context.Context) *Release {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return nil
+		// у сервиса GitHub лимит 60 запросов в час с одного адреса: много людей за одним провайдером
+		// могут в него упереться. Тогда узнаём версию по адресу «последний релиз» — у него лимита нет.
+		return checkUpdateByRedirect(ctx)
 	}
 	var gh struct {
 		Tag    string `json:"tag_name"`
@@ -313,4 +315,42 @@ func copyTree(src, dst string) error {
 		}
 		return os.Chmod(t, info.Mode().Perm()|0o200)
 	})
+}
+
+func checkUpdateByRedirect(ctx context.Context) *Release {
+	if os.Getenv("KROHOBOR_UPDATE_URL") != "" {
+		return nil
+	}
+	page := "https://github.com/" + UpdateRepo + "/releases/latest"
+	req, err := http.NewRequestWithContext(ctx, "HEAD", page, nil)
+	if err != nil {
+		return nil
+	}
+	c := &http.Client{Timeout: 8 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	resp, err := c.Do(req)
+	if err != nil {
+		return nil
+	}
+	resp.Body.Close()
+	loc := resp.Header.Get("Location") // …/releases/tag/v1.4.2
+	i := strings.LastIndex(loc, "/tag/")
+	if i < 0 {
+		return nil
+	}
+	tag := loc[i+5:]
+	if !newer(tag, AppVersion) {
+		return nil
+	}
+	ver := strings.TrimPrefix(tag, "v")
+	name := "DimaKrohobor-" + ver + assetSuffix()
+	if runtime.GOOS == "darwin" {
+		name = "auto-update-mac.zip"
+	}
+	r := &Release{Version: ver, URL: "https://github.com/" + UpdateRepo + "/releases/tag/" + tag,
+		Asset: "https://github.com/" + UpdateRepo + "/releases/download/" + tag + "/" + name}
+	updMu.Lock()
+	lastRelease = r
+	updMu.Unlock()
+	logf("доступно обновление %s", r.Version)
+	return r
 }
