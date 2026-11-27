@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -14,6 +15,19 @@ import (
 // и иначе она осталась бы висеть в фоне.
 var openWindows atomic.Int32
 var onLastWindowClosed = func() {}
+
+// окна, которые открыла программа: при обновлении и «Закрыть программу» закрываем их сами
+var winMu sync.Mutex
+var winProcs []*os.Process
+
+func closeWindows() {
+	winMu.Lock()
+	defer winMu.Unlock()
+	for _, p := range winProcs {
+		_ = p.Kill()
+	}
+	winProcs = nil
+}
 
 // Отдельное окно программы: интерфейс открывается в Chrome, Edge, Яндекс Браузере,
 // Brave или Chromium в режиме приложения — без вкладок, адресной строки и закладок.
@@ -31,6 +45,9 @@ func openWindow(url, cfgDir string) {
 			if err := cmd.Start(); err == nil {
 				start := time.Now()
 				openWindows.Add(1)
+				winMu.Lock()
+				winProcs = append(winProcs, cmd.Process)
+				winMu.Unlock()
 				go func() {
 					_ = cmd.Wait()
 					// процесс, который сразу вышел, просто передал окно уже открытому браузеру — это не закрытие

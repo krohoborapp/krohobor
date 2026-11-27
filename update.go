@@ -216,8 +216,10 @@ func applyUpdate(c *JobCtl) (string, error) {
 	_ = os.Remove(zipPath)
 	logf("обновлено до %s", r.Version)
 	go func() {
-		time.Sleep(800 * time.Millisecond)
+		time.Sleep(1500 * time.Millisecond)
 		releaseInstance()
+		closeWindows()                      // старое окно закрываем сами — новая версия откроет своё
+		time.Sleep(1200 * time.Millisecond) // браузеру нужно время отпустить профиль окна
 		if runtime.GOOS == "darwin" {
 			_ = exec.Command("open", "-n", newExe).Start()
 		} else {

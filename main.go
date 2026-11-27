@@ -1278,7 +1278,7 @@ func main() {
 		},
 		"/api/quit": func(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, map[string]bool{"ok": true})
-			go func() { time.Sleep(300 * time.Millisecond); releaseInstance(); os.Exit(0) }()
+			go func() { time.Sleep(600 * time.Millisecond); closeWindows(); releaseInstance(); os.Exit(0) }()
 		},
 	}
 	for path, h := range api {
