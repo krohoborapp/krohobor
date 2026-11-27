@@ -116,7 +116,7 @@ APP="{NAME}.app"
 echo "Подписываю приложение (бесплатная подпись без аккаунта разработчика)…"
 chmod +x "$APP/Contents/MacOS/"* "$APP/Contents/Resources/MainApp/"*/*
 xattr -cr "$APP"
-if [ -f "mac-window/build-window.sh" ] && [ ! -f "$APP/Contents/MacOS/DimaKrohobor" ]; then
+if [ -f "mac-window/build-window.sh" ] && [ ! -f "$APP/Contents/MacOS/{NAME}" ]; then
   if xcode-select -p >/dev/null 2>&1 && xcrun --find swiftc >/dev/null 2>&1; then
     zsh mac-window/build-window.sh "$APP" || {{ echo "Окно не собралось — программа будет открываться в браузере."; [ -n "$DK_REQUIRE_WINDOW" ] && exit 1; }}
   else
