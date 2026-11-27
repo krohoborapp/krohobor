@@ -110,7 +110,7 @@ with open(os.path.join(app, "Contents", "Info.plist"), "w", encoding="utf-8") as
 """)
 
 dmg_script = f"""#!/bin/zsh
-# Собирает {SLUG}-{VER}.dmg и {SLUG}-{VER}-mac.zip (для обновлений) из «{NAME}.app». Запускать на маке.
+# Собирает {SLUG}-{VER}.dmg и auto-update-mac.zip (для обновлений) из «{NAME}.app». Запускать на маке.
 cd "$(dirname "$0")" || exit 1
 APP="{NAME}.app"
 echo "Подписываю приложение (бесплатная подпись без аккаунта разработчика)…"
@@ -131,8 +131,8 @@ if ! codesign --force --deep --sign - "$APP"; then
   codesign --force --deep --sign - "$APP" || exit 1
 fi
 echo "Собираю архив для обновлений…"
-rm -f "{SLUG}-{VER}-mac.zip"
-ditto -c -k --keepParent "$APP" "{SLUG}-{VER}-mac.zip"
+rm -f "auto-update-mac.zip"
+ditto -c -k --keepParent "$APP" "auto-update-mac.zip"
 echo "Собираю DMG…"
 STAGE=$(mktemp -d)
 cp -R "$APP" "$STAGE/"
@@ -142,7 +142,7 @@ for i in 1 2 3; do hdiutil create -volname "{NAME}" -srcfolder "$STAGE" -ov -for
 [ -f "{SLUG}-{VER}.dmg" ] || exit 1
 rm -rf "$STAGE"
 echo ""
-echo "Готово: {SLUG}-{VER}.dmg и {SLUG}-{VER}-mac.zip лежат рядом с этим файлом."
+echo "Готово: {SLUG}-{VER}.dmg и auto-update-mac.zip лежат рядом с этим файлом."
 [ -z "$CI" ] && open -R "{SLUG}-{VER}.dmg"
 exit 0
 """

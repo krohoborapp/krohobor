@@ -1,7 +1,7 @@
 package main
 
 // Проверка обновлений через релизы GitHub и обновление в один клик.
-// Ожидаемые файлы релиза: DimaKrohobor-<версия>-mac.zip (внутри «Дима Крохобор.app»),
+// Ожидаемые файлы релиза: auto-update-mac.zip (внутри «Дима Крохобор.app»; ищется по окончанию -mac.zip),
 // DimaKrohobor-<версия>-windows.zip и DimaKrohobor-<версия>-linux.zip (внутри папка с программой).
 
 import (
