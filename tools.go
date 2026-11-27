@@ -306,6 +306,31 @@ func (t *Tools) Login(ctx context.Context, email, password, code string) LoginRe
 		args := []string{"auth", "login", "-e", email, "-p", password}
 		if code != "" {
 			args = append(args, "--auth-code", code)
+		} else {
+			// первый шаг — с --debug: по ответу Apple отличаем неверный пароль от запроса кода.
+			// Такой вывод в журнал не пишем: в нём служебные данные входа.
+			dbg, err := t.command(ctx, "", t.Ipatool, append(args, "--debug")...).CombinedOutput()
+			logf("$ %s auth login -e %s -p *** --debug → (вывод не записывается)", filepath.Base(t.Ipatool), email)
+			if err == nil || len(dbg) > 0 {
+				d := reANSI.ReplaceAllString(string(dbg), "")
+				if !regexp.MustCompile(`(?i)unknown|unrecognized|invalid (option|argument)`).MatchString(d) {
+					ft, cm := appleFailure(d)
+					logf("вход: ответ Apple (failureType=%q, сообщение=%q)", ft, cm)
+					if ft != "" || badPassMsg.MatchString(cm) {
+						return LoginResult{Error: "Bad login", Hint: "Неверный пароль Apple ID — Apple его не приняла, поэтому и код не придёт. Проверь раскладку и Caps Lock или войди с этим паролем на icloud.com."}
+					}
+					if acc := t.AuthInfo(ctx); acc.LoggedIn && strings.EqualFold(acc.Email, email) {
+						_ = os.MkdirAll(ipatoolHome(), 0o700)
+						_ = os.WriteFile(filepath.Join(ipatoolHome(), "login"), nil, 0o600)
+						_, _, _ = t.Run(ctx, "", t.Ipatool, "kbsync", "--refresh")
+						return LoginResult{OK: true}
+					}
+					low := strings.ToLower(d)
+					if strings.Contains(low, "two-factor") || strings.Contains(low, "auth-code") || strings.Contains(low, "2fa") {
+						return LoginResult{NeedCode: true}
+					}
+				}
+			}
 		}
 		o, _, err := t.Run(ctx, "", t.Ipatool, args...)
 		if err != nil {
