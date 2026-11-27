@@ -1056,6 +1056,9 @@ func main() {
 		if self, err := os.Executable(); err == nil {
 			_ = os.Remove(self + ".old")
 		}
+		if runtime.GOOS != "darwin" {
+			go cleanupOld(root)
+		}
 	}
 	tools, err := LoadTools(s.base)
 	s.tools = tools

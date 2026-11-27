@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -151,10 +152,21 @@ func applyUpdate(c *JobCtl) (string, error) {
 		return "", err
 	}
 	defer os.RemoveAll(tmp)
-	zipPath := filepath.Join(tmp, "update.zip")
-	c.Progress(-1, "Скачиваю обновление…")
-	if err := downloadTo(r.Asset, zipPath, c); err != nil {
-		return "", fmt.Errorf("не скачалось обновление: %v", err)
+	// скачанный файл обновления храним: если установка сорвётся, повтор не будет качать заново
+	cache := filepath.Join(os.TempDir(), "dimakrohobor-update-cache")
+	_ = os.MkdirAll(cache, 0o755)
+	zipPath := filepath.Join(cache, "v"+r.Version+"-"+filepath.Base(r.Asset))
+	if st, err := os.Stat(zipPath); err == nil && st.Size() > 0 {
+		c.Progress(-1, "Файл обновления уже скачан")
+	} else {
+		c.Progress(-1, "Скачиваю обновление…")
+		part := zipPath + ".part"
+		if err := downloadTo(r.Asset, part, c); err != nil {
+			return "", fmt.Errorf("не скачалось обновление: %v", err)
+		}
+		if err := os.Rename(part, zipPath); err != nil {
+			return "", err
+		}
 	}
 	c.Progress(-1, "Распаковываю…")
 	ex := filepath.Join(tmp, "x")
@@ -201,6 +213,7 @@ func applyUpdate(c *JobCtl) (string, error) {
 		newExe = self
 		_ = os.Chmod(newExe, 0o755)
 	}
+	_ = os.Remove(zipPath)
 	logf("обновлено до %s", r.Version)
 	go func() {
 		time.Sleep(800 * time.Millisecond)
@@ -313,7 +326,19 @@ func copyTree(src, dst string) error {
 		if info.IsDir() {
 			return os.MkdirAll(t, 0o755)
 		}
-		_ = os.Remove(t)
+		if err := os.Remove(t); err != nil && !os.IsNotExist(err) {
+			// файл занят (например, DLL у работающей утилиты): на Windows его можно переименовать, но не перезаписать
+			old := t + ".old"
+			for i := 2; ; i++ {
+				if _, e := os.Stat(old); os.IsNotExist(e) || os.Remove(old) == nil {
+					break
+				}
+				old = fmt.Sprintf("%s.old%d", t, i)
+			}
+			if err := os.Rename(t, old); err != nil {
+				return fmt.Errorf("файл %s занят другой программой — закрой «Дима Крохобор» и запусти снова, обновление повторится", filepath.Base(t))
+			}
+		}
 		if err := copyFile(p, t); err != nil {
 			return err
 		}
@@ -374,3 +399,17 @@ func extractDMG(dmg, dst string) error {
 	}
 	return nil
 }
+
+// cleanupOld удаляет файлы, отодвинутые при прошлом обновлении (*.old, *.old2…).
+func cleanupOld(root string) {
+	for _, sub := range []string{"MainApp", "Files"} { // только свои папки: программа может лежать рядом с файлами человека
+		_ = filepath.Walk(filepath.Join(root, sub), func(p string, info os.FileInfo, err error) error {
+			if err == nil && !info.IsDir() && regexpOld.MatchString(filepath.Base(p)) {
+				_ = os.Remove(p)
+			}
+			return nil
+		})
+	}
+}
+
+var regexpOld = regexp.MustCompile(`\.old\d*$`)

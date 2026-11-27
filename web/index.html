@@ -388,6 +388,8 @@ h2{margin:0;font:750 27px/1.15 var(--disp);letter-spacing:-.5px}
 .block:not(.far){cursor:auto}
 #desk.cangrab,#desk.cangrab *{cursor:grab}
 #desk.dragging,#desk.dragging *{cursor:grabbing!important}
+#desk.dragging,body.swiping{user-select:none;-webkit-user-select:none}
+.hrow,.edge,.nav,.chip,.seg,.btn,.act,.tile{user-select:none;-webkit-user-select:none}
 .edge{position:fixed;z-index:8;display:flex;align-items:center;gap:0;height:44px;min-width:44px;padding:0 14px;border-radius:999px;font-weight:700;font-size:13.5px;color:var(--text);opacity:.86;transition:opacity .2s,transform .2s,gap .2s}
 .seg{display:inline-flex;padding:4px;gap:4px;border-radius:14px;background:var(--card2)}
 .seg button{padding:9px 16px;border-radius:10px;font-weight:700;font-size:14px;color:var(--muted);transition:background .15s,color .15s}
@@ -1631,7 +1633,8 @@ function reveal(file) { api('/api/reveal?file=' + encodeURIComponent(file), {met
 /* смахивание строки влево — мышкой или двумя пальцами на тачпаде */
 let swipe = null;
 document.addEventListener('pointerdown', e => { const r = e.target.closest('.hrow'); if (!r || e.target.closest('button')) return; swipe = {r, x:e.clientX, dx:0}; });
-document.addEventListener('pointermove', e => { if (!swipe) return; swipe.dx = Math.min(0, e.clientX - swipe.x); if (swipe.dx < -6) { swipe.r.style.transition = 'none'; swipe.r.style.transform = `translateX(${swipe.dx}px)`; swipe.r.style.opacity = 1 + swipe.dx / 300; } });
+addEventListener('pointercancel', () => { if (swipe) { swipe.r.style.transform = ''; swipe.r.style.opacity = ''; swipe = null; } });
+document.addEventListener('pointermove', e => { if (!swipe) return; if (e.pointerType === 'mouse' && e.buttons === 0) { swipe.r.style.transform = ''; swipe.r.style.opacity = ''; swipe = null; return; } swipe.dx = Math.min(0, e.clientX - swipe.x); if (swipe.dx < -6) { swipe.r.style.transition = 'none'; swipe.r.style.transform = `translateX(${swipe.dx}px)`; swipe.r.style.opacity = 1 + swipe.dx / 300; } });
 document.addEventListener('pointerup', () => {
   if (!swipe) return; const {r, dx} = swipe; swipe = null; r.style.transition = ''; r.style.opacity = '';
   if (dx < -90) { r.style.transform = ''; removeHist(r.querySelector('.qb:last-child') || r, r.dataset.ids.split(',').map(Number)); r.dataset.swiped = '1'; }
@@ -1847,11 +1850,15 @@ $('desk').addEventListener('pointerdown', e => {
 });
 addEventListener('pointermove', e => {
   if (!drag) return;
+  if (e.pointerType === 'mouse' && e.buttons === 0) { const moved = drag.moved; drag = null; $('desk').classList.remove('dragging'); if (moved) magnet(600); return; }
   const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
   if (!drag.moved && Math.hypot(dx, dy) < 5) return;
-  if (!drag.moved) { drag.moved = true; $('desk').classList.add('dragging'); try { $('desk').setPointerCapture(drag.id); } catch (err) {} }
+  if (!drag.moved) { drag.moved = true; $('desk').classList.add('dragging'); try { getSelection().removeAllRanges(); } catch (err) {} try { $('desk').setPointerCapture(drag.id); } catch (err) {} }
   cam.x = drag.cx + dx; cam.y = drag.cy + dy; apply();
 });
+// отпустили кнопку за пределами окна или система отобрала указатель — заканчиваем перетаскивание
+addEventListener('pointercancel', () => { if (drag) { drag = null; $('desk').classList.remove('dragging'); magnet(600); } });
+addEventListener('blur', () => { if (drag) { drag = null; $('desk').classList.remove('dragging'); magnet(600); } });
 addEventListener('pointerup', () => {
   if (!drag) return;
   const moved = drag.moved; drag = null; $('desk').classList.remove('dragging');
