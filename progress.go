@@ -36,6 +36,13 @@ func (c *JobCtl) Queue(detail string) {
 	c.jobs.mu.Unlock()
 }
 
+// SetPhase — «install», когда файл реально начинает уходить на iPhone (окно переводит камеру на телефон).
+func (c *JobCtl) SetPhase(p string) {
+	c.jobs.mu.Lock()
+	c.job.Phase = p
+	c.jobs.mu.Unlock()
+}
+
 func (c *JobCtl) Run() {
 	c.jobs.mu.Lock()
 	c.job.Status = "running"

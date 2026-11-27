@@ -71,6 +71,7 @@ type Job struct {
 	File     string   `json:"file,omitempty"`   // файл в библиотеке, с которым связана задача
 	Name     string   `json:"name,omitempty"`   // понятное имя приложения
 	Target   string   `json:"target,omitempty"` // на какой iPhone ставим (пусто — только скачать)
+	Phase    string   `json:"phase,omitempty"`  // install — файл уже уходит на iPhone
 }
 
 type Jobs struct {
@@ -849,7 +850,9 @@ func (s *Server) handleInstall(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "файл не найден")
 		return
 	}
-	if old := s.jobs.Active(func(j *Job) bool { return j.Kind == "install" && j.File == filepath.Base(path) && j.Target == req.Device.Name }); old != nil {
+	if old := s.jobs.Active(func(j *Job) bool {
+		return j.Kind == "install" && j.File == filepath.Base(path) && j.Target == req.Device.Name
+	}); old != nil {
 		writeJSON(w, map[string]any{"jobId": old.ID, "already": true})
 		return
 	}

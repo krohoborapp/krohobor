@@ -396,7 +396,7 @@ h2{margin:0;font:750 27px/1.15 var(--disp);letter-spacing:-.5px}
 .seg button:disabled{cursor:default}
 .seg button:disabled:not(.on){opacity:.5}
 .edge span{max-width:0;overflow:hidden;white-space:nowrap;transition:max-width .25s}
-.edge:hover{gap:8px}.edge:hover span,.edge:focus-visible span{max-width:200px}
+.edge:hover,.edge.open{gap:8px}.edge:hover span,.edge.open span,.edge:focus-visible span{max-width:220px}
 .edge:hover{opacity:1}
 .edge svg{width:16px;height:16px}
 #eL{left:296px;top:50%;transform:translateY(-50%)}#eL:hover{transform:translateY(-50%) translateX(-3px)}
@@ -957,7 +957,7 @@ const readyDevice = () => S.devices.find(d => d.trusted);
 
 /* ================= экран iPhone: рабочий стол и установка ================= */
 let phoneSig = '', landedKeys = new Set(), failedKeys = new Map();
-const installJobs = () => S.jobs.filter(j => j.target && (j.status === 'running' || j.status === 'queued' || (Date.now() / 1000 - (j.finished || 0) < 3 && j.status === 'done') || failedKeys.has(j.appId || j.file)));
+const installJobs = () => S.jobs.filter(j => j.target && (((j.status === 'running' || j.status === 'queued') && (j.kind === 'install' || j.phase === 'install')) || (Date.now() / 1000 - (j.finished || 0) < 3 && j.status === 'done') || failedKeys.has(j.appId || j.file)));
 const jobKey = j => j.appId || j.file || ('j' + j.id);
 function tileHTML(key, id, name, extra, file, bundle) {
   const src = iconSrc(id, file, bundle);
@@ -1016,7 +1016,22 @@ document.addEventListener('wheel', e => {
   if (Math.abs(pgWheel) > 80) { const dir = pgWheel > 0 ? 1 : -1; pgWheel = 0; if ((dir < 0 && phonePg > 0) || (dir > 0 && !$('pgR').hidden)) phonePage(dir); }
 }, {passive:false, capture:true});
 /* иконка вылетает из карточки и садится на экран iPhone */
-let lastSrc = null; const flyingKeys = new Set();
+let lastSrc = null; const flyingKeys = new Set(), pendingFx = new Map();
+// скачивание закончилось и файл пошёл на iPhone — тогда и летим к телефону
+function checkPendingFx() {
+  for (const [id, name] of [...pendingFx]) {
+    const j = S.jobs.find(x => x.appId === id && x.target && x.kind === 'download' && (x.status === 'running' || x.status === 'queued' || x.phase === 'install'));
+    if (!j) { if (!S.jobs.some(x => x.appId === id && (x.status === 'running' || x.status === 'queued'))) pendingFx.delete(id); continue; }
+    if (j.phase !== 'install') continue;
+    pendingFx.delete(id);
+    const here = (S.view === 'detail' && S.detail && S.detail.id === id) || S.view === 'home';
+    if (here) {
+      const ic = S.view === 'detail' ? document.querySelector('#detail .icon.lg') : null;
+      lastSrc = ic ? ic.getBoundingClientRect() : null;
+      startInstallFx(id, id, name, '');
+    } else toast('Отправляю на iPhone: ' + name, 'Скачалось — теперь ставлю на телефон', {appId:id, name});
+  }
+}
 document.addEventListener('pointerdown', e => {
   const det = e.target.closest('#detail'), card = e.target.closest('.app,.row,.hrow,.brow');
   const ic = det ? det.querySelector('.icon.lg') : card ? card.querySelector('.icon') : null;
@@ -1365,7 +1380,7 @@ async function download(id, name, versionId, versionLabel, andInstall, batch) {
   try {
     const res = await api('/api/download', {json:body});
     if (res && res.already) { pollJobs(); toast('Уже в работе: ' + name, 'Прогресс — в «Загрузках» справа сверху', {appId:id, name}); return; }
-    if (andInstall) { startInstallFx(id, id, name, '', !!batch); if (!batch) toast('Ставлю на ' + dev.name, name + ': сначала скачаю, потом отправлю на iPhone', {appId:id, name}); }
+    if (andInstall) { if (!batch) { pendingFx.set(id, name); toast('Скачиваю: ' + name, 'Как скачается — сам отправлю на ' + dev.name + ' и покажу на телефоне', {appId:id, name}); } pollJobs(); }
     else { pollJobs(); toast('Скачиваю: ' + name, 'Прогресс — справа сверху', {appId:id, name}); }
   } catch (err) { toast('Не получилось', err.message, {icon:ICON_ERR, color:'var(--err)'}); }
 }
@@ -1525,10 +1540,11 @@ async function pollJobs() {
   S.jobsPrimed = true;
   if (libChanged) { await loadLib(); renderLibrary(); renderCatalogList(); renderPurchaseList(); renderHome(); if (S.detail) renderDetail(); }
   const active = S.jobs.filter(j => j.status === 'running' || j.status === 'queued').length;
-  if (active && !dlOpen && primed) { dlOpen = true; dlManual = false; }
+  const visibleHere = S.view === 'home' || (S.view === 'detail' && S.detail && S.jobs.every(j => !(j.status === 'running' || j.status === 'queued') || j.appId === S.detail.id));
+  if (active && !dlOpen && primed && !visibleHere) { dlOpen = true; dlManual = false; }
   if (!active && dlOpen && !dlManual && !dlCloseT) dlCloseT = setTimeout(() => { dlCloseT = null; if (!dlManual) { dlOpen = false; renderQueue(); } }, 5000);
   if (active) { clearTimeout(dlCloseT); dlCloseT = null; }
-  renderQueue(); renderDetailJobs(); renderPhoneScreen();
+  renderQueue(); renderDetailJobs(); renderPhoneScreen(); checkPendingFx();
   if (!driverOK()) renderHome();
   if (S.wiz && S.wiz.step === 'driver') renderWizard();
   if (active) pollTimer = setTimeout(pollJobs, 700);
@@ -1538,7 +1554,7 @@ function jobCard(j) {
   const last = running || queued ? (j.detail || (j.log||[]).slice(-1)[0] || 'Запускаю…') : failed && j.hint ? j.hint : j.result;
   return `<div class="job ${j.status}"><div class="t"><span class="st">${j.status === 'done' ? '✓' : failed ? '!' : ''}</span><b title="${esc(j.title)}">${esc(j.title.replace(/^Загрузка: /, ''))}</b>${running && !indet ? `<span class="pct">${Math.floor(j.progress)}%</span>` : ''}${!running && !queued ? `<button class="x" onclick="S.hidden.add(${j.id});renderQueue()" aria-label="Скрыть">×</button>` : ''}</div>
     ${running || queued ? `<div class="bar ${indet ? 'indet' : ''}"><i style="width:${indet ? 30 : Math.max(2, j.progress)}%"></i></div>` : ''}
-    <div class="l">${esc(last)}</div>${failed && j.hint ? `<div class="tech">Ответ Apple: ${esc(j.result)}</div><button class="btn ghost sm" style="margin-top:8px" onclick="openReport()">Сообщить о проблеме</button>` : ''}</div>`;
+    <div class="l">${esc(last)}</div>${running && /по Wi‑Fi/.test(j.detail || '') ? '<div class="tech" style="font-family:inherit">По Wi‑Fi 200 МБ идут 2–4 минуты — это нормально. По кабелю в разы быстрее.</div>' : ''}${failed && j.hint ? `<div class="tech">Ответ Apple: ${esc(j.result)}</div><button class="btn ghost sm" style="margin-top:8px" onclick="openReport()">Сообщить о проблеме</button>` : ''}</div>`;
 }
 function batchCards() {
   const tags = [...new Set(S.jobs.filter(j => j.batch && j.batch.startsWith('batch-')).map(j => j.batch))];
@@ -1791,13 +1807,20 @@ function renderWizard() {
 /* ================= стрелки, перетаскивание и магнит ================= */
 const NEIGH = {home:{L:'purchases', R:'catalog', U:'device', D:'library'}, purchases:{R:'home'}, catalog:{L:'home'}, device:{D:'home'}, library:{U:'home'}};
 const NAMES = {home:'Главная', catalog:'Каталог', purchases:'Мои покупки', library:'Библиотека', device:'Проверка'};
+// с карточки приложения — стрелка обратно туда, откуда пришли (в сторону провода)
+function detailBack() {
+  const back = S.detailFrom === 'search' || !pos[S.detailFrom] ? 'home' : S.detailFrom, f = pos[back], t = pos.detail;
+  if (!f || !t) return {};
+  const dx = (f.x + f.w / 2) - (t.x + t.w / 2), dy = (f.y + f.h / 2) - (t.y + t.h / 2);
+  return {[Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'L' : 'R') : (dy < 0 ? 'U' : 'D')]: back};
+}
 function renderEdges() {
-  const n = S.view === 'detail' ? {} : (NEIGH[S.view] || {});
+  const n = S.view === 'detail' ? detailBack() : (NEIGH[S.view] || {});
   $('allBtn').classList.toggle('on', S.view === 'all');
   $('eU').style.top = (safeArea().y - (innerWidth > 980 ? 52 : 0)) + 'px';
-  for (const d of ['L','R','U','D']) { const b = $('e' + d); b.hidden = !n[d]; if (n[d]) { b.querySelector('span').textContent = NAMES[n[d]]; b.title = `Перейти: «${NAMES[n[d]]}». Можно и стрелкой ${{L:'←', R:'→', U:'↑', D:'↓'}[d]} на клавиатуре`; } }
+  for (const d of ['L','R','U','D']) { const b = $('e' + d); b.hidden = !n[d]; b.classList.toggle('open', S.view === 'detail'); if (n[d]) { b.querySelector('span').textContent = (S.view === 'detail' ? 'Назад: ' : '') + NAMES[n[d]]; b.title = `Перейти: «${NAMES[n[d]]}». Можно и стрелкой ${{L:'←', R:'→', U:'↑', D:'↓'}[d]} на клавиатуре`; } }
 }
-function edgeGo(d) { const to = (NEIGH[S.view] || {})[d]; if (to) showView(to); }
+function edgeGo(d) { if (S.view === 'detail') { if (detailBack()[d]) closeDetail(); return; } const to = (NEIGH[S.view] || {})[d]; if (to) showView(to); }
 function magnet(ms) {
   const a = safeArea(), cx = a.x + a.w / 2, cy = a.y + a.h / 2;
   let best = null, bd = Infinity;

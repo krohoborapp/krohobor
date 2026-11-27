@@ -678,6 +678,11 @@ func (t *Tools) Install(ctx context.Context, d Device, ipa string, c *JobCtl) er
 		lk.Lock()
 	}
 	defer lk.Unlock()
+	c.SetPhase("install")
+	via := ""
+	if d.Network {
+		via = " по Wi‑Fi"
+	}
 	tmp := filepath.Join(os.TempDir(), fmt.Sprintf("krohobor_%d.ipa", time.Now().UnixNano()))
 	if err := copyFile(ipa, tmp); err != nil {
 		return err
@@ -706,12 +711,12 @@ func (t *Tools) Install(ctx context.Context, d Device, ipa string, c *JobCtl) er
 				return
 			case <-tk.C:
 				if !c.toolActive() {
-					c.Progress(-1, "Отправляю на iPhone "+mb(size)+" · "+elapsed(start))
+					c.Progress(-1, "Отправляю на iPhone"+via+" "+mb(size)+" · "+elapsed(start))
 				}
 			}
 		}
 	}()
-	c.Progress(-1, "Отправляю на iPhone "+mb(size))
+	c.Progress(-1, "Отправляю на iPhone"+via+" "+mb(size))
 	onLine := func(l string) {
 		if !c.installLine(l) {
 			c.Log(l)
