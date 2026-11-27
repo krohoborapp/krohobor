@@ -116,6 +116,14 @@ APP="{NAME}.app"
 echo "Подписываю приложение (бесплатная подпись без аккаунта разработчика)…"
 chmod +x "$APP/Contents/MacOS/"* "$APP/Contents/Resources/MainApp/"*/*
 xattr -cr "$APP"
+if [ -f "mac-window/build-window.sh" ] && [ ! -f "$APP/Contents/MacOS/DimaKrohobor" ]; then
+  if xcode-select -p >/dev/null 2>&1 && xcrun --find swiftc >/dev/null 2>&1; then
+    zsh mac-window/build-window.sh "$APP" || {{ echo "Окно не собралось — программа будет открываться в браузере."; [ -n "$DK_REQUIRE_WINDOW" ] && exit 1; }}
+  else
+    echo "Swift не найден — программа будет открываться в браузере (своё окно собирает GitHub)."
+    [ -n "$DK_REQUIRE_WINDOW" ] && exit 1
+  fi
+fi
 if ! codesign --force --deep --sign - "$APP"; then
   echo "Пересобираю универсальный файл системным lipo и пробую ещё раз…"
   BIN="$APP/Contents/MacOS/dimakrohobor"; T=$(mktemp -d)
@@ -130,11 +138,13 @@ STAGE=$(mktemp -d)
 cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/Программы"
 rm -f "{SLUG}-{VER}.dmg"
-hdiutil create -volname "{NAME}" -srcfolder "$STAGE" -ov -format UDZO "{SLUG}-{VER}.dmg" || exit 1
+for i in 1 2 3; do hdiutil create -volname "{NAME}" -srcfolder "$STAGE" -ov -format UDZO "{SLUG}-{VER}.dmg" && break; sleep 5; done
+[ -f "{SLUG}-{VER}.dmg" ] || exit 1
 rm -rf "$STAGE"
 echo ""
 echo "Готово: {SLUG}-{VER}.dmg и {SLUG}-{VER}-mac.zip лежат рядом с этим файлом."
-open -R "{SLUG}-{VER}.dmg"
+[ -z "$CI" ] && open -R "{SLUG}-{VER}.dmg"
+exit 0
 """
 intel_script = f"""#!/bin/zsh
 # Запускает Intel-версию программы через Rosetta, чтобы проверить её на маке с M-чипом.
@@ -147,6 +157,7 @@ echo "Важно: перед проверкой закрой обычную ве
 echo "Запускаю Intel-версию… В разделе «iPhone и проверка» должно быть написано «macOS amd64»."
 arch -x86_64 "./{NAME}.app/Contents/MacOS/dimakrohobor"
 """
+shutil.copytree(os.path.join(PKG, "mac"), os.path.join(OUT, "mac-window"), dirs_exist_ok=True)
 for fname, body in [("Собрать DMG.command", dmg_script), ("Проверить Intel-версию.command", intel_script)]:
     p = os.path.join(OUT, fname)
     open(p, "w", encoding="utf-8").write(body)

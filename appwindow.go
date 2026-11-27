@@ -70,3 +70,6 @@ func appBrowsers() []string {
 	}
 	return found
 }
+
+// hostMode: программу запустило своё окно на Mac — адрес отдаём ему, браузер не открываем.
+func hostMode() bool { return os.Getenv("KROHOBOR_HOST") != "" }

@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -21,6 +22,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 )
 
@@ -979,7 +981,12 @@ func tryExisting(cfg string) bool {
 		}
 		return false
 	}
-	openWindow(fmt.Sprintf("http://127.0.0.1:%d/?t=%s", in.Port, in.Token), cfg)
+	u := fmt.Sprintf("http://127.0.0.1:%d/?t=%s", in.Port, in.Token)
+	if hostMode() {
+		fmt.Println("ATTACH: " + u) // своё окно на Mac подключится к уже работающей программе
+	} else {
+		openWindow(u, cfg)
+	}
 	return true
 }
 
@@ -1244,7 +1251,16 @@ func main() {
 	fmt.Println("Окно программы открыто. Если не открылось — скопируй ссылку в браузер:")
 	fmt.Println(url)
 	fmt.Println("Не закрывай это окно, пока пользуешься программой.")
-	if os.Getenv("KROHOBOR_NO_BROWSER") == "" {
+	go func() { // корректное завершение, когда окно программы закрывают
+		ch := make(chan os.Signal, 1)
+		signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
+		<-ch
+		releaseInstance()
+		os.Exit(0)
+	}()
+	if hostMode() {
+		fmt.Println("URL: " + url)
+	} else if os.Getenv("KROHOBOR_NO_BROWSER") == "" {
 		openWindow(url, s.cfgDir)
 	}
 	log.Fatal(http.Serve(ln, mux))

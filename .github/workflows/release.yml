@@ -28,14 +28,17 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with: { name: dist, path: dist }
-      - name: DMG
+      - name: Своё окно и DMG
+        env: { DK_REQUIRE_WINDOW: "1" }
         run: |
           cd dist
           chmod +x "Собрать DMG.command"
-          ./"Собрать DMG.command" || true
+          ./"Собрать DMG.command"
           ls -la
       - uses: softprops/action-gh-release@v2
         with:
+          name: Дима Крохобор ${{ github.ref_name }}
+          draft: true
           files: |
             dist/*.dmg
             dist/*-mac.zip
