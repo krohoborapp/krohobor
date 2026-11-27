@@ -33,15 +33,16 @@ var AppVersion = "1.0.0" // задаётся при сборке релиза: -
 var webFS embed.FS
 
 type Server struct {
-	pageURL string // адрес страницы с токеном — для повторного открытия окна
-	base    string
-	files   string
-	apps    string
-	tools   *Tools
-	toolErr string
-	token   string
-	authMu  sync.RWMutex // вход/выход — эксклюзивно, остальные команды ipatool — параллельно
-	jobs    *Jobs
+	pageURL   string // адрес страницы с токеном — для повторного открытия окна
+	base      string
+	files     string
+	apps      string
+	tools     *Tools
+	toolErr   string
+	token     string
+	authMu    sync.RWMutex  // вход/выход — эксклюзивно, остальные команды ipatool — параллельно
+	loginSess *loginSession // вход, который ждёт код подтверждения
+	jobs      *Jobs
 
 	purchMu    sync.Mutex
 	purchCache map[string][]StoreApp
@@ -267,7 +268,21 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	defer s.authMu.Unlock()
 	ctx, cancel := s.ctx(r, 2*time.Minute)
 	defer cancel()
-	res := s.tools.Login(ctx, strings.TrimSpace(req.Email), req.Password, strings.TrimSpace(req.Code))
+	email, code := strings.TrimSpace(req.Email), strings.TrimSpace(req.Code)
+	var res LoginResult
+	switch {
+	case code != "" && s.loginSess != nil && strings.EqualFold(s.loginSess.email, email):
+		// код — в тот же открытый вход, где Apple его и попросила
+		res = s.tools.LoginCode(s.loginSess, code)
+		s.loginSess = nil
+	case code == "" && interactiveLoginSupported():
+		if s.loginSess != nil {
+			s.loginSess.kill()
+		}
+		s.loginSess, res = s.tools.LoginStart(email, req.Password)
+	default:
+		res = s.tools.Login(ctx, email, req.Password, code)
+	}
 	if res.Error != "" {
 		res.Hint = friendly(res.Error)
 		if req.Code != "" && badLoginRe.MatchString(res.Error) {
