@@ -1,0 +1,33 @@
+# Каждую ночь проверяет, какие приложения каталога есть в App Store, и кладёт результат
+# в ветку data (availability.json). Программа скачивает этот файл при запуске.
+name: Проверка каталога
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+  push:
+    paths: ["catalog.txt"]
+permissions:
+  contents: write
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: "1.22" }
+      - name: Свежая подборка IPA_Downloader
+        run: curl -fsSL https://raw.githubusercontent.com/kda2495/IPA_Downloader/refs/heads/main/Files/AppsList.txt -o AppsList.txt || true
+      - name: Проверка
+        run: go run ./tools/availability -catalog catalog.txt -list AppsList.txt -out /tmp/availability.json
+      - name: Публикация в ветку data
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git fetch origin data || true
+          git checkout -B data
+          git rm -rf --cached . >/dev/null 2>&1 || true
+          cp /tmp/availability.json availability.json
+          git add availability.json
+          git commit -m "availability $(date -u +%F)" || exit 0
+          git push -f origin data

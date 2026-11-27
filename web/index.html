@@ -1,0 +1,1834 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Дима Крохобор — возврат приложений на iPhone</title>
+<link rel="icon" href="/favicon.png">
+<script>document.documentElement.dataset.theme='dark';try{if(localStorage.getItem('theme')==='light')document.documentElement.dataset.theme='light'}catch(e){}</script>
+<style>
+/*
+  VOICE: друг, который разобрался, — спокойно, по-русски, крупно.
+  IDEA: рабочий стол мастера сверху; окно программы — камера, которая летает между блоками.
+  PICTURE: живой iPhone с кабелем в центре стола, вокруг блоки, соединённые чертёжными линиями.
+  COLOUR/TYPE: жёлтый #FBBD03, чёрный #232323, серый #D7DCDB, голубой Telegram #2AABEE; системный шрифт.
+  LAYOUT: сетка 3×3 блоков на столе; меню, поиск и загрузки висят поверх.
+*/
+:root{
+  --y:#FBBD03; --y2:#E5AB00; --ink:#232323; --tg:#2AABEE; --tg2:#1E96D4; --ok:#2BB673; --err:#E5484D;
+  --desk:#1B1B1B; --grain:.5; --grid:rgba(255,255,255,.028);
+  --card:#262626; --card2:#2F2F2F; --hover:#353535; --line:rgba(255,255,255,.09); --wire:rgba(255,255,255,.16);
+  --text:#F1F1F1; --muted:#A0A0A0; --faint:#6E6E6E; --glass:rgba(38,38,38,.84);
+  --shadow:0 30px 60px -20px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.06);
+  --gone:rgba(251,189,3,.16); --gonefg:#FBBD03; --live:rgba(43,182,115,.16); --livefg:#3DD68C; --newbg:rgba(42,171,238,.16); --newfg:#6CC8F5;
+  --sys:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI Variable Text","Segoe UI",Roboto,system-ui,sans-serif;
+  --disp:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI Variable Display","Segoe UI",Roboto,system-ui,sans-serif;
+  color-scheme:dark;
+}
+:root[data-theme=light]{
+  --desk:#E3E6E5; --grain:.18; --grid:rgba(35,35,35,.045);
+  --card:#FFFFFF; --card2:#EEF1F0; --hover:#E5E9E8; --line:rgba(35,35,35,.1); --wire:rgba(35,35,35,.22);
+  --text:#232323; --muted:#5E6563; --faint:#8C9391; --glass:rgba(255,255,255,.88);
+  --shadow:0 30px 60px -24px rgba(35,35,35,.35),0 0 0 1px rgba(35,35,35,.06);
+  --gone:#FFF1C2; --gonefg:#7A5B00; --live:#DDF3E6; --livefg:#17703F; --newbg:#DCEFFC; --newfg:#0F6FA8;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--desk);color:var(--text);font:14.5px/1.45 var(--sys);-webkit-font-smoothing:antialiased}
+button,input,textarea{font:inherit;color:inherit}
+button{border:0;background:none;cursor:pointer}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--y);outline-offset:3px;border-radius:10px}
+svg{display:block;flex:none}
+::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:10px;border:3px solid transparent;background-clip:content-box}
+
+/* ---------- стол ---------- */
+#desk{position:fixed;inset:0;overflow:hidden;background:radial-gradient(120% 90% at 50% 40%,transparent 40%,rgba(0,0,0,.35) 100%),var(--desk)}
+:root[data-theme=light] #desk{background:radial-gradient(120% 90% at 50% 40%,transparent 50%,rgba(0,0,0,.06) 100%),var(--desk)}
+#desk::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:var(--grain);mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E")}
+#world{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform;
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:80px 80px}
+#wires{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
+#wires path{fill:none;stroke:var(--wire);stroke-width:1.5}
+#wires .dot{fill:var(--desk);stroke:var(--wire);stroke-width:1.5}
+#wires .dot.on{fill:var(--y);stroke:var(--y)}
+.dim{position:absolute;color:var(--faint);font-size:12px;pointer-events:none;white-space:nowrap}
+.dim i{position:absolute;background:var(--wire)}
+
+.block{position:absolute}
+.block.far{cursor:zoom-in}
+.block.far>*{pointer-events:none}
+.block.far .panel{opacity:.8}
+body.overview .block.far{transition:filter .2s}
+body.overview .block.far:hover .panel,body.overview .block.far:hover .phone{opacity:1;box-shadow:0 0 0 6px var(--y)}
+body.overview .block.far:hover{filter:brightness(1.06)}
+.panel{background:var(--card);box-shadow:var(--shadow);border-radius:24px;padding:26px 28px;height:100%;display:flex;flex-direction:column;min-height:0}
+.scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;margin:0 -10px;padding:0 10px}
+h2{margin:0;font:750 27px/1.15 var(--disp);letter-spacing:-.5px}
+.lede{color:var(--muted);margin:6px 0 14px;font-size:14.5px;max-width:70ch}
+.head{display:flex;align-items:flex-start;gap:12px}
+.head .grow{flex:1;min-width:0}
+.grow{flex:1;min-width:0}
+
+/* кнопки, метки */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;background:var(--y);color:var(--ink);font-weight:700;border-radius:12px;padding:10px 16px;white-space:nowrap;text-decoration:none;transition:background .15s,transform .15s}
+.btn:hover{background:var(--y2)}
+.btn:active{transform:scale(.97)}
+.btn.ghost{background:var(--card2);color:var(--text)}
+.btn.ghost:hover{background:var(--hover)}
+.btn.tg{background:var(--tg);color:#fff}.btn.tg:hover{background:var(--tg2)}
+.btn.sm{padding:7px 12px;font-size:13px;border-radius:10px}
+.btn.lg{padding:14px 22px;font-size:16px;border-radius:14px}
+.btn.wide{width:100%;padding:12px 13px;border-radius:12px;white-space:normal;text-align:center;line-height:1.25}
+.app .btn.ghost{background:var(--card)}.app .btn.ghost:hover{background:var(--desk)}
+.btn:disabled{opacity:.5;cursor:default}
+.tag{display:inline-flex;align-items:center;font-size:12px;font-weight:650;border-radius:999px;padding:3px 10px;background:var(--card2);color:var(--muted);white-space:nowrap}
+.tag.live{background:var(--live);color:var(--livefg)}.tag.gone{background:var(--gone);color:var(--gonefg)}.tag.new{background:var(--newbg);color:var(--newfg)}
+.chips{display:flex;gap:7px;flex-wrap:wrap;margin:4px 0 12px}
+.chip{border-radius:999px;padding:7px 14px;background:var(--card2);font-weight:600;font-size:13.5px}
+.chip:hover{background:var(--hover)}
+.chip.on{background:transparent;box-shadow:inset 0 0 0 1.5px var(--text)}
+.chip i{font-style:normal;opacity:.55;margin-left:5px;font-weight:500}
+.field{border:0;background:var(--card2);border-radius:10px;padding:9px 13px;outline:none;min-width:0}
+.field:focus{box-shadow:0 0 0 2px var(--y)}
+.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.qtip{display:inline-grid;place-items:center;width:18px;height:18px;padding:0;border-radius:50%;background:var(--card2);color:var(--muted);font-size:11px;font-weight:800;cursor:pointer;vertical-align:1px;margin-left:4px;transition:background .15s,color .15s}
+.qtip:hover,.qtip.on{background:var(--y);color:var(--ink)}
+#tipPop{position:fixed;z-index:80;max-width:300px;padding:12px 14px;border-radius:14px;font-size:13.5px;line-height:1.45;color:var(--text);animation:drop .18s cubic-bezier(.2,1,.3,1)}
+.note{padding:12px 14px;border-radius:14px;background:var(--gone);font-size:13.5px;margin:0 0 12px}
+.note.blue{background:var(--newbg)}
+.note.err{background:rgba(229,72,77,.15);color:var(--err)}
+.empty{color:var(--muted);text-align:center;padding:40px 12px}
+.empty b{display:block;color:var(--text);font:700 17px var(--disp);margin-bottom:4px}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:rot .9s linear infinite;vertical-align:-2px}
+@keyframes rot{to{transform:rotate(360deg)}}
+.bar{height:6px;border-radius:9px;background:var(--card2);overflow:hidden;position:relative}
+.bar i{display:block;height:100%;background:var(--y);border-radius:9px;transition:width .4s}
+.bar.indet i{width:30%!important;position:absolute;animation:indet 1.4s ease-in-out infinite}
+@keyframes indet{0%{left:-30%}100%{left:100%}}
+
+/* иконки */
+.icon{width:48px;height:48px;border-radius:12px;display:grid;place-items:center;font:800 20px var(--disp);color:#fff;flex:none;position:relative}
+.icon>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.icon::after{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 .5px rgba(255,255,255,.22)}
+.icon.lg{width:84px;height:84px;border-radius:20px;font-size:34px}
+.icon .sd{position:absolute;right:-3px;bottom:-3px;width:14px;height:14px;border-radius:50%;border:2.5px solid var(--card);z-index:2}
+.sd.live{background:var(--ok)}.sd.gone{background:var(--y)}.sd.lib{background:var(--tg)}
+.icon .nb{position:absolute;right:-8px;top:-7px;background:var(--tg);color:#fff;font-size:10px;font-weight:800;border-radius:999px;padding:1px 6px;z-index:2;font-family:var(--sys)}
+.legend{display:flex;gap:14px;color:var(--muted);font-size:12.5px;flex-wrap:wrap;margin-bottom:10px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+
+/* ---------- Главная ---------- */
+#b-home{width:1040px;height:820px}
+.phone-wrap{position:absolute;left:60px;top:30px;width:320px;height:760px}
+.phone{position:absolute;left:10px;top:0;width:300px;height:612px;border-radius:54px;background:#0A0A0A;padding:12px;
+  box-shadow:0 0 0 2px #3A3A3A,0 0 0 3.5px #121212,0 50px 80px -30px rgba(0,0,0,.8);transition:box-shadow .5s}
+.phone.trust{box-shadow:0 0 0 2px #3A3A3A,0 0 0 3.5px #121212,0 0 0 8px rgba(251,189,3,.55),0 50px 80px -30px rgba(0,0,0,.8)}
+.phone.ok{box-shadow:0 0 0 2px #3A3A3A,0 0 0 3.5px #121212,0 0 0 8px rgba(43,182,115,.6),0 50px 80px -30px rgba(0,0,0,.8)}
+.phone::before{content:"";position:absolute;right:-5px;top:150px;width:3px;height:80px;border-radius:3px;background:#2A2A2A}
+.screen{position:relative;height:100%;border-radius:43px;background:#000;overflow:hidden}
+.island{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:96px;height:28px;border-radius:20px;background:#000;z-index:3}
+.scr{position:absolute;inset:0;opacity:0;transition:opacity .5s;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;color:#fff}
+.scr.on{opacity:1}
+.scr.trust{background:linear-gradient(160deg,#2b2b2b,#141414)}
+.alert{background:rgba(60,60,60,.85);border-radius:16px;width:100%;overflow:hidden;font-size:13px}
+.alert b{display:block;padding:16px 14px 4px;font-size:14.5px}
+.alert p{margin:0;padding:0 14px 14px;color:#cfcfcf;font-size:12.5px}
+.alert div{display:flex;border-top:.5px solid rgba(255,255,255,.2)}
+.alert span{flex:1;padding:11px;color:#3D9BFF}
+.alert span+span{border-left:.5px solid rgba(255,255,255,.2);font-weight:700}
+.scr.ok{background:radial-gradient(120% 80% at 50% 0%,rgba(251,189,3,.55),transparent 60%),linear-gradient(180deg,#2a2412,#0d0d0d)}
+.scr.ok .big{width:84px;height:84px;border-radius:50%;background:var(--ok);display:grid;place-items:center;margin-bottom:14px;animation:pop .5s cubic-bezier(.2,1.6,.4,1)}
+.scr.ok b{font:700 22px var(--disp)}
+.scr.ok span{opacity:.75;font-size:13px;margin-top:4px}
+@keyframes pop{from{transform:scale(.3);opacity:0}}
+.scr.ok{z-index:4;pointer-events:none}
+.phone:not(.justok) .scr.ok{opacity:0}
+.scr.home{background:radial-gradient(130% 70% at 20% 0%,rgba(251,189,3,.5),transparent 55%),radial-gradient(120% 60% at 100% 100%,rgba(42,171,238,.28),transparent 60%),linear-gradient(180deg,#2a2412,#0d0d0d);justify-content:flex-start;padding:52px 14px 10px;align-items:stretch;display:flex;flex-direction:column}
+.sbar{position:absolute;top:17px;left:30px;right:26px;display:flex;justify-content:space-between;font:650 12.5px var(--sys);color:#fff;z-index:2}
+.sbar span:last-child{max-width:64px;text-align:right;white-space:nowrap;overflow:hidden}
+.hgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px 8px;align-content:start}
+.tile{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;position:relative}
+.tile .ti{width:52px;height:52px;border-radius:13px;display:grid;place-items:center;font:800 20px var(--disp);color:#fff;position:relative;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.tile .ti img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.tile span{font-size:9.5px;color:#fff;max-width:62px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.tile.pending .ti img,.tile.pending .ti b{filter:brightness(.45) grayscale(.3)}
+.tile .pie{position:absolute;inset:0;display:grid;place-items:center;z-index:2}
+.tile .pie i{width:30px;height:30px;border-radius:50%;background:conic-gradient(transparent var(--p,0%),rgba(0,0,0,.55) 0);box-shadow:0 0 0 2.5px rgba(255,255,255,.85)}
+.tile.waiting .pie i{background:none;border:2.5px solid rgba(255,255,255,.85);border-right-color:transparent;box-shadow:none;animation:rot 1s linear infinite}
+.tile.arriving{visibility:hidden}
+.tile.landed .ti{animation:land .7s cubic-bezier(.2,1.6,.4,1)}
+@keyframes land{0%{transform:scale(.6)}60%{transform:scale(1.15)}100%{transform:scale(1)}}
+.tile.failed .ti{filter:grayscale(1) brightness(.6);animation:shake .5s}
+@keyframes shake{20%,60%{transform:translateX(-5px)}40%,80%{transform:translateX(5px)}}
+.hmore{grid-column:1/-1;text-align:center;font-size:10.5px;color:rgba(255,255,255,.7)}
+.hpages{position:relative;flex:1;overflow:hidden;min-height:0}
+.hgrid{transition:transform .35s cubic-bezier(.2,.9,.3,1),opacity .35s}
+.hgrid.out-l{transform:translateX(-30px);opacity:0}.hgrid.out-r{transform:translateX(30px);opacity:0}
+.hdots{display:flex;justify-content:center;gap:7px;padding:8px 0 2px}
+.hdots i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.35);cursor:pointer}
+.hdots i.on{background:#fff}
+.pgbtn{position:absolute;top:50%;transform:translateY(-50%);width:34px;height:34px;border-radius:50%;background:var(--card);box-shadow:var(--shadow);display:grid;place-items:center;font-size:18px;font-weight:800;color:var(--text);z-index:5}
+.pgbtn.l{left:-48px}.pgbtn.r{right:-48px}
+.wifi{position:absolute;left:50%;top:628px;transform:translateX(-50%) rotate(180deg);width:110px;height:82px;opacity:0;transition:opacity .4s}
+.phone-wrap.net .wifi{opacity:1}
+.phone-wrap.net .cable{opacity:0}
+#phoneWrap.net ~ #dimPort{left:194px!important;top:752px!important}
+#dimPort{transition:left .4s,top .4s}
+.cable{transition:opacity .4s}
+.wifi path{fill:none;stroke:var(--y);stroke-width:7;stroke-linecap:round;opacity:.35}
+.wifi circle{fill:var(--y)}
+.phone-wrap.net.flow .wifi path{animation:wave 1.2s ease-in-out infinite}
+.phone-wrap.net.flow .wifi path:nth-of-type(2){animation-delay:.2s}.phone-wrap.net.flow .wifi path:nth-of-type(3){animation-delay:.4s}
+@keyframes wave{0%,100%{opacity:.25}40%{opacity:1}}
+.phone.flash{box-shadow:0 0 0 2px #3A3A3A,0 0 0 3.5px #121212,0 0 0 14px rgba(43,182,115,.75),0 50px 80px -30px rgba(0,0,0,.8)!important}
+.flowdot{opacity:0;transition:opacity .3s}
+.cable.flow .flowdot{opacity:1}
+.flyicon{position:fixed;z-index:70;pointer-events:none;border-radius:14px;overflow:hidden;display:grid;place-items:center;color:#fff;font:800 22px var(--disp);box-shadow:0 20px 40px rgba(0,0,0,.45)}
+.flyicon img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.cable{position:absolute;left:0;top:603px;width:320px;height:300px;overflow:visible;z-index:0}
+.phone{z-index:1}
+.plug{transition:transform .45s cubic-bezier(.3,1.4,.5,1)}
+.plug.out{transform:translateY(70px)}
+.homecol{position:absolute;left:470px;top:30px;width:560px}
+.homecol h1{margin:0;font:800 38px/1.1 var(--disp);letter-spacing:-1px}
+.hcard{background:var(--card);box-shadow:var(--shadow);border-radius:22px;padding:20px 22px;margin-top:14px}
+.statuscard{display:flex;gap:20px;align-items:center}
+.ring{width:88px;height:88px;flex:none;position:relative}
+.ring svg{width:88px;height:88px}
+.ring circle{fill:none;stroke-width:7;stroke-linecap:round}
+.ring .bg{stroke:var(--card2)}
+.ring .fg{stroke:var(--y);stroke-dasharray:70 220;transform-origin:50% 50%;animation:rot 1.2s linear infinite;transition:stroke .3s}
+.ring.trust .fg{stroke-dasharray:180 110}
+.ring.ok .fg{stroke:var(--ok);stroke-dasharray:290 0;animation:none}
+.ring .ck{position:absolute;inset:0;display:grid;place-items:center;opacity:0;transition:opacity .3s}
+.ring.ok .ck{opacity:1}
+.statuscard b{display:block;font:700 18px var(--disp)}
+.statuscard span{display:block;color:var(--muted);margin:3px 0 10px}
+.acts{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
+.act{background:var(--card);box-shadow:var(--shadow);border-radius:20px;padding:16px;text-align:left;min-height:122px;display:flex;flex-direction:column;justify-content:flex-end;transition:transform .2s}
+.act:hover{transform:translateY(-3px)}
+.act b{font:700 16px/1.2 var(--disp);display:block}
+.act span{color:var(--muted);font-size:12.5px;margin-top:3px}
+.act.y{background:var(--y);color:var(--ink)}.act.y span{color:var(--ink);opacity:.7}
+.statline{margin-top:14px;color:var(--muted);font-size:13px;display:flex;gap:16px;flex-wrap:wrap}
+.statline b{color:var(--text)}
+.tgcard{background:var(--tg);color:#fff;border-radius:22px;padding:18px 20px;margin-top:14px;display:flex;align-items:center;gap:14px}
+.tgcard::before{content:"";width:46px;height:46px;border-radius:50%;flex:none;background:var(--y) url(/avatar.jpg) center/cover;box-shadow:0 0 0 2.5px #fff}
+.tgcard b{display:block;font:750 17px var(--disp)}
+.tgcard span{display:block;opacity:.9;font-size:13px}
+.tgcard a{background:#fff;color:#1679AD;font-weight:750;border-radius:11px;padding:9px 14px;text-decoration:none;white-space:nowrap}
+
+/* каталог — сетка карточек */
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;padding-bottom:16px}
+.app{background:var(--card2);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:12px;cursor:pointer;transition:background .15s}
+.app:hover{background:var(--hover)}
+.app .top{display:flex;gap:12px;align-items:center;min-width:0}
+.app .top div{min-width:0}
+.app b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.app small{display:block;color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.app .bot{display:flex;gap:8px}
+.app .bot .btn{flex:1}
+.ghead{grid-column:1/-1;color:var(--faint);font-size:12.5px;font-weight:650;padding:10px 4px 0}
+
+/* списки */
+.row{display:flex;align-items:center;gap:14px;padding:10px 8px;border-radius:14px;cursor:pointer}
+.row+.row{box-shadow:0 -1px 0 var(--line)}
+.row:hover{background:var(--hover)}
+.row .nm{flex:1;min-width:0}
+.row .nm b{display:block;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .nm span{display:block;color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.check{display:grid;grid-template-columns:26px minmax(150px,1fr) minmax(0,1.6fr) auto;gap:12px;align-items:start;padding:10px 0;box-shadow:0 -1px 0 var(--line)}
+.check .d{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:12px;font-weight:800;background:var(--ok)}
+.check.bad .d{background:var(--err)}.check.warn .d{background:var(--y);color:var(--ink)}
+.check .s{color:var(--muted);font-size:13px;word-break:break-word}
+.check .h{color:var(--text);font-size:13px;margin-top:3px}
+.cgroup{color:var(--faint);font-size:12.5px;font-weight:650;padding:14px 0 4px}
+.sysinfo{margin-top:12px;background:var(--card2);border-radius:14px;padding:12px 14px;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace;color:var(--muted);white-space:pre-wrap;word-break:break-all}
+
+/* карточка приложения */
+.dtop{display:flex;gap:16px;align-items:center;margin-bottom:12px}
+.dtop h2{font-size:24px}
+.dtop p{margin:3px 0 6px;color:var(--muted);font-size:13px}
+.facts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.fact{background:var(--card2);border-radius:12px;padding:9px 11px}
+.fact span{display:block;color:var(--muted);font-size:11.5px}
+.fact b{font-size:14px}
+.hintbox{background:var(--card2);border-radius:12px;padding:10px 12px;font-size:13px;color:var(--muted);margin-bottom:10px}
+.hintbox b{color:var(--text)}
+.ilabel{color:var(--faint);font-size:12px;font-weight:650;margin:12px 2px 7px}
+.opt{display:flex;align-items:center;gap:10px;padding:9px 11px;background:var(--card2);border-radius:12px;margin-bottom:6px;cursor:pointer;box-shadow:inset 0 0 0 1.5px transparent}
+.opt.on{box-shadow:inset 0 0 0 1.5px var(--y)}
+.opt b{display:block;font-size:13.5px}
+.opt span{display:block;font-size:12px;color:var(--muted)}
+.opt .radio{width:16px;height:16px;border-radius:50%;border:2px solid var(--faint);flex:none}
+.opt.on .radio{border:5px solid var(--y)}
+.compat{font-size:12px;font-weight:650}.compat.ok{color:var(--livefg)}.compat.bad{color:var(--err)}
+.dcols{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:18px;flex:1;min-height:0}
+.dside{display:flex;flex-direction:column;gap:8px}
+
+/* ---------- поверх стола ---------- */
+.float{position:fixed;z-index:10;background:var(--glass);backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4);box-shadow:var(--shadow);border-radius:22px}
+#menu{left:20px;bottom:20px;width:262px;padding:12px;max-height:calc(100vh - 40px);overflow-y:auto;transition:opacity .3s,transform .3s}
+.brand{display:flex;gap:11px;align-items:center;padding:4px 6px 10px}
+.mark{width:40px;height:40px;border-radius:12px;background:var(--y) url(/avatar.jpg) center/cover;color:transparent;display:grid;place-items:center;font:900 21px var(--disp);flex:none;box-shadow:inset 0 0 0 .5px rgba(255,255,255,.25)}
+.brand b{display:block;font:750 16px/1.15 var(--disp)}
+.brand small{color:var(--muted);font-size:12px}
+.me{display:flex;gap:11px;align-items:center;padding:9px 10px;border-radius:14px;background:var(--card2);margin-bottom:6px;width:100%;text-align:left}
+.me:hover{background:var(--hover)}
+.av{width:34px;height:34px;border-radius:50%;background:var(--card);display:grid;place-items:center;font-weight:800;flex:none}
+.me.on .av{background:var(--y);color:var(--ink)}
+.me .who{min-width:0}
+.me .who b{display:block;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.me .who span{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav{display:flex;align-items:center;gap:12px;width:100%;padding:9px 11px;border-radius:13px;text-align:left;transition:background .15s}
+.nav svg{width:21px;height:21px}
+.nav .lbl{min-width:0}
+.nav b{display:block;font-size:15.5px;font-weight:650;line-height:1.2}
+.nav .lbl span{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav:hover{background:var(--hover)}
+.nav.on{background:var(--y);color:var(--ink)}
+.nav.on .lbl span{color:var(--ink);opacity:.65}
+.nav .cnt{margin-left:auto;font-size:11.5px;font-weight:750;background:var(--card2);border-radius:999px;padding:1px 8px;color:var(--text)}
+.nav .cnt.new{background:var(--tg);color:#fff}
+.nav.on .cnt{background:rgba(35,35,35,.14);color:var(--ink)}
+.nav .pdot{width:9px;height:9px;border-radius:50%;margin-left:auto;background:var(--faint)}
+.nav .pdot.ok{background:var(--ok)}.nav .pdot.trust{background:var(--y);box-shadow:0 0 0 3px rgba(251,189,3,.3)}
+.tgline{display:flex;align-items:center;gap:9px;color:var(--tg);font-weight:650;text-decoration:none;padding:8px 11px;border-radius:12px;font-size:14px}
+.tgline:hover{background:var(--hover)}
+.mfoot{display:flex;align-items:center;gap:6px;margin-top:6px;padding-top:9px;border-top:1px solid var(--line)}
+.round{width:36px;height:36px;border-radius:50%;background:var(--card2);display:grid;place-items:center;font-weight:800}
+.round svg{width:17px;height:17px}
+.mfoot .tgl{margin-left:auto;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.sw{width:34px;height:20px;border-radius:20px;background:var(--card2);position:relative;transition:background .2s;display:inline-block}
+.sw::after{content:"";position:absolute;left:3px;top:3px;width:14px;height:14px;border-radius:50%;background:var(--muted);transition:transform .2s,background .2s}
+.sw.on{background:var(--y)}.sw.on::after{transform:translateX(14px);background:var(--ink)}
+.ver{color:var(--faint);font-size:11.5px;padding:6px 4px 0}
+#menuBtn{left:20px;bottom:20px;width:54px;height:54px;border-radius:18px;display:none;place-items:center}
+
+#top{top:18px;left:300px;display:flex;gap:8px;padding:7px;border-radius:18px;align-items:center;transition:opacity .3s}
+.search{display:flex;align-items:center;gap:9px;background:var(--card2);border-radius:12px;padding:0 12px;height:44px;width:clamp(280px,calc(100vw - 880px),640px);color:var(--muted)}
+.search:focus-within{box-shadow:0 0 0 2px var(--y)}
+.search svg{width:18px;height:18px;color:var(--text)}
+.search input{font-size:15.5px}
+.search input::placeholder{color:var(--muted)}
+.search input{border:0;background:none;outline:none;color:var(--text);flex:1;min-width:0}
+.kbd{font-size:11.5px;border:1px solid var(--line);border-radius:6px;padding:1px 6px;white-space:nowrap}
+.hb{display:flex;align-items:center;gap:8px;height:42px;padding:0 14px;border-radius:12px;font-weight:700;background:var(--card2);white-space:nowrap;text-decoration:none}
+.hb:hover{background:var(--hover)}
+.hb i{width:22px;height:22px;border-radius:50%;background:var(--text);color:var(--desk);display:grid;place-items:center;font-style:normal;font-size:12px;font-weight:800}
+.hb.tgb{background:var(--tg);color:#fff}.hb.tgb:hover{background:var(--tg2)}
+.hb svg{width:17px;height:17px}
+#sres{position:absolute;left:7px;top:56px;width:min(560px,80vw);max-height:min(62vh,560px);overflow-y:auto;padding:8px;border-radius:18px;background:var(--glass);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:var(--shadow);
+  transform-origin:top left;animation:drop .22s cubic-bezier(.2,1,.3,1)}
+@keyframes drop{from{opacity:0;transform:translateY(-6px) scale(.98)}}
+#sres .row .icon{width:42px;height:42px;border-radius:10px;font-size:17px}
+#sres .shint{color:var(--muted);font-size:12.5px;padding:8px 10px 4px}
+
+#dlBtn{top:18px;right:20px;height:58px;padding:0 16px 0 14px;display:flex;align-items:center;gap:10px;font-weight:700;border-radius:18px;transition:transform .2s}
+#dlBtn:hover{transform:translateY(-1px)}
+#dlBtn .ico{width:32px;height:32px;border-radius:10px;background:var(--card2);display:grid;place-items:center;position:relative}
+#dlBtn .ico svg{width:17px;height:17px}
+#dlBtn .ring2{position:absolute;inset:-3px;border-radius:12px;border:2px solid var(--y);border-right-color:transparent;animation:rot 1s linear infinite}
+#dlBtn .cnt{background:var(--y);color:var(--ink);border-radius:999px;font-size:12px;padding:1px 8px}
+#dlBtn .cnt.idle{background:var(--card2);color:var(--muted)}
+#dl{top:86px;right:20px;width:380px;padding:14px 14px 10px;max-height:calc(100vh - 110px);overflow-y:auto;overflow-x:hidden;z-index:12;transform-origin:top right;animation:drop .25s cubic-bezier(.2,1,.3,1)}
+#dl .dh{display:flex;align-items:center;gap:8px;margin:0 2px 4px}
+#dl .dh b{font:700 16px var(--disp);flex:1}
+#dl .dh button.lnk{color:var(--muted);font-size:12.5px;padding:4px 6px;border-radius:8px}
+#dl .dh button.lnk:hover{color:var(--text);background:var(--hover)}
+.job{background:var(--card2);border-radius:16px;padding:11px 12px;margin-top:8px}
+.job .t{display:flex;align-items:center;gap:9px}
+.job .t b{font-size:13.5px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.job .pct{font:750 13px var(--disp);font-variant-numeric:tabular-nums}
+.job .l{color:var(--muted);font-size:12.5px;margin-top:5px;word-break:break-word}
+.job.error .l{color:var(--text)}
+.job .tech{color:var(--faint);font-size:11px;margin-top:5px;font-family:ui-monospace,Menlo,Consolas,monospace;word-break:break-word}
+.job .bar{margin-top:8px;height:4px}
+.job .x{color:var(--muted);font-size:17px;line-height:1}
+.job.batch{box-shadow:inset 0 0 0 1.5px var(--y)}
+.job.tgc{background:var(--tg);color:#fff}.job.tgc .l{color:#fff;opacity:.92}.job.tgc .x{color:#fff}
+.st{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:800;color:#fff;flex:none}
+.done .st{background:var(--ok)}.error .st{background:var(--err)}
+.running .st{border:2px solid var(--y);border-right-color:transparent;animation:rot .9s linear infinite}
+.queued .st{border:2px dashed var(--faint)}
+.hlabel{color:var(--faint);font-size:12px;font-weight:650;margin:14px 4px 4px}
+.hrow{position:relative;border-radius:14px;margin:2px 0;touch-action:pan-y;transition:transform .25s,opacity .25s,max-height .3s;max-height:400px}
+.hrow.gone{transform:translateX(-110%);opacity:0;max-height:0;margin:0}
+.hrow .hm{display:flex;align-items:center;gap:11px;padding:8px;border-radius:14px;cursor:pointer;background:transparent}
+.hrow:hover .hm{background:var(--hover)}
+.hrow .icon{width:38px;height:38px;border-radius:10px;font-size:15px}
+.hrow .icon .sb{position:absolute;right:-4px;bottom:-4px;width:17px;height:17px;border-radius:50%;display:grid;place-items:center;font-size:9.5px;font-weight:900;color:#fff;border:2px solid var(--card);z-index:2}
+.hrow .tx2{flex:1;min-width:0}
+.hrow .tx2 b{display:block;font-size:13.5px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hrow .tx2 span{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hrow .qa{display:none;gap:4px}
+.hrow:hover .qa{display:flex}
+.qb{height:30px;min-width:30px;padding:0 9px;border-radius:9px;background:var(--card2);font-size:12px;font-weight:700;display:grid;place-items:center;white-space:nowrap}
+.qb:hover{background:var(--y);color:var(--ink)}
+.qb svg{width:15px;height:15px}
+.hrow .more{padding:2px 10px 10px 57px;font-size:12.5px;color:var(--muted)}
+.hrow .more .tech{color:var(--faint);font-size:11px;margin-top:5px;font-family:ui-monospace,Menlo,Consolas,monospace;word-break:break-word}
+.hint2{color:var(--faint);font-size:11.5px;text-align:center;padding:10px 0 2px}
+#banners{position:fixed;top:84px;left:calc(50% + 140px);transform:translateX(-50%);z-index:9;display:flex;flex-direction:column;gap:8px;width:min(720px,calc(100vw - 640px));min-width:360px}
+.banner{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 10px 10px 16px;border-radius:16px;font-size:13.5px;animation:drop .3s cubic-bezier(.2,1,.3,1)}
+.banner .grow{min-width:200px}
+.banner.drv{box-shadow:var(--shadow),inset 0 0 0 1.5px var(--y)}
+
+/* стрелки к соседним блокам и перетаскивание стола */
+#desk{cursor:grab}
+#desk.dragging{cursor:grabbing}
+#desk.dragging .block{pointer-events:none}
+.block:not(.far){cursor:auto}
+.edge{position:fixed;z-index:8;display:flex;align-items:center;gap:8px;padding:9px 14px;border-radius:999px;font-weight:700;font-size:13.5px;color:var(--text);opacity:.86;transition:opacity .2s,transform .2s}
+.edge:hover{opacity:1}
+.edge svg{width:16px;height:16px}
+#eL{left:300px;top:50%;transform:translateY(-50%)}#eL:hover{transform:translateY(-50%) translateX(-3px)}
+#eR{right:20px;top:50%;transform:translateY(-50%)}#eR:hover{transform:translateY(-50%) translateX(3px)}
+#eU{top:84px;left:calc(50% + 140px);transform:translateX(-50%)}#eU:hover{transform:translateX(-50%) translateY(-3px)}
+#eD{bottom:20px;left:calc(50% + 140px);transform:translateX(-50%)}#eD:hover{transform:translateX(-50%) translateY(3px)}
+body.wizard .edge{display:none}
+@media (max-width:980px){#eL{left:20px}#eU,#eD{left:50%}}
+
+/* всплывающие плашки */
+#toast{position:fixed;left:50%;bottom:28px;z-index:30;transform:translate(-50%,16px) scale(.96);opacity:0;pointer-events:none;
+  transition:opacity .28s ease,transform .38s cubic-bezier(.2,1.2,.3,1);display:flex;gap:14px;align-items:center;padding:13px 18px 13px 13px;border-radius:20px;min-width:330px;max-width:520px}
+#toast.show{opacity:1;transform:translate(-50%,0) scale(1);pointer-events:auto}
+#toast .ti{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;flex:none;color:#fff;font:800 18px var(--disp);position:relative;overflow:hidden}
+#toast .ti img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#toast b{display:block;font-size:14.5px}
+#toast span{display:block;color:var(--muted);font-size:12.5px}
+#toast .tl{height:3px;border-radius:3px;background:var(--card2);margin-top:8px;overflow:hidden}
+#toast .tl i{display:block;height:100%;background:var(--text);width:0}
+#toast.show .tl i{animation:tl 4s linear forwards}
+@keyframes tl{to{width:100%}}
+
+/* окна */
+.veil{position:fixed;inset:0;z-index:40;background:rgba(10,10,10,.45);display:none;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(3px)}
+.veil.show{display:flex}
+.sheet{background:var(--card);border-radius:24px;padding:24px;width:100%;max-width:460px;max-height:88vh;overflow:auto;box-shadow:var(--shadow);animation:sheet .3s cubic-bezier(.2,1.2,.3,1)}
+@keyframes sheet{from{opacity:0;transform:translateY(12px) scale(.97)}}
+.sheet.wide{max-width:740px}
+.sheet h3{margin:0 0 6px;font:750 21px/1.2 var(--disp)}
+.sheet .lede{margin-top:0}
+.fld{display:flex;flex-direction:column;gap:6px;margin:12px 0}
+.fld label{font-size:13px;font-weight:650;color:var(--muted)}
+.fld input{border:0;background:var(--card2);border-radius:11px;padding:12px 13px;outline:none}
+.fld input:focus{box-shadow:0 0 0 2px var(--y)}
+.code-in{font:750 26px var(--disp)!important;letter-spacing:10px;text-align:center}
+.acts2{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;flex-wrap:wrap;align-items:center}
+.xbtn{width:34px;height:34px;border-radius:50%;background:var(--card2);display:grid;place-items:center;font-size:18px}
+.report{width:100%;min-height:200px;border:0;border-radius:12px;background:var(--card2);padding:12px;font:12.5px/1.45 ui-monospace,Menlo,Consolas,monospace;resize:vertical}
+.blist{max-height:44vh;overflow-y:auto;overflow-x:hidden;margin:10px -6px 0;padding:0 6px}
+.brow{display:flex;align-items:center;gap:12px;padding:8px 6px;border-radius:12px;cursor:pointer}
+.brow:hover{background:var(--hover)}
+.brow input{width:18px;height:18px;accent-color:#E5AB00;flex:none}
+.brow .nm{flex:1;min-width:0}
+.brow .nm b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brow .nm span{display:block;font-size:12.5px;color:var(--muted)}
+.brow .icon{width:38px;height:38px;border-radius:9px;font-size:16px}
+.stage{display:flex;align-items:center;gap:10px;margin:8px 0;font-size:14px}
+.stage .n{width:24px;height:24px;border-radius:50%;background:var(--card2);display:grid;place-items:center;font-size:12px;font-weight:750;flex:none}
+.stage.on .n{background:var(--y);color:var(--ink)}
+.stage.done .n{background:var(--ok);color:#fff}.stage.done{color:var(--muted)}
+.faq details{background:var(--card2);border-radius:14px;margin-bottom:8px;padding:0 14px}
+.faq summary{cursor:pointer;padding:13px 0;font-weight:650;list-style:none;display:flex;align-items:center;gap:10px}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::before{content:"+";width:22px;height:22px;border-radius:50%;background:var(--card);display:grid;place-items:center;font-weight:800;flex:none}
+.faq details[open] summary::before{content:"–"}
+.faq .a{padding:0 0 14px 32px;color:var(--muted);font-size:13.5px}
+.faq .a ol{margin:4px 0;padding-left:18px}
+.faq .a b{color:var(--text)}
+.steps{list-style:none;margin:10px 0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;counter-reset:st}
+.steps li{counter-increment:st;background:var(--card2);border-radius:14px;padding:12px}
+.steps li::before{content:counter(st);display:grid;place-items:center;width:24px;height:24px;border-radius:8px;background:var(--y);color:var(--ink);font-weight:800;font-size:12.5px;margin-bottom:7px}
+.steps b{display:block;font-size:13.5px}.steps span{color:var(--muted);font-size:12px}
+
+/* мастер первого запуска — карточка, камера ведёт по столу */
+#wiz{left:20px;bottom:20px;width:440px;padding:22px;z-index:35;max-height:calc(100vh - 40px);overflow-y:auto;animation:sheet .4s cubic-bezier(.2,1.2,.3,1)}
+#wiz h3{margin:0 0 8px;font:800 26px/1.15 var(--disp);letter-spacing:-.5px}
+#wiz .lede{font-size:14.5px}
+.wsteps{display:flex;gap:5px;margin-bottom:16px}
+.wsteps i{flex:1;height:5px;border-radius:9px;background:var(--line)}
+.wsteps i.on{background:var(--y)}
+.wnav{display:flex;align-items:center;gap:8px;margin-top:16px}
+.skip{color:var(--muted);font-weight:600;padding:8px}
+.bigstat{display:flex;align-items:center;gap:13px;background:var(--card2);border-radius:16px;padding:13px;margin-bottom:9px}
+.bigstat .d{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;font-weight:800;flex:none;background:var(--card)}
+.bigstat.ok .d{background:var(--ok);color:#fff}.bigstat.bad .d{background:var(--err);color:#fff}.bigstat.wait .d{background:var(--y);color:var(--ink)}
+.bigstat b{display:block}.bigstat span{display:block;color:var(--muted);font-size:13px}
+body.wizard #menu,body.wizard #top,body.wizard #dl,body.wizard #dlBtn,body.wizard #banners{opacity:0;pointer-events:none}
+/* при настройке стол под карточкой размыт и затемнён, чтобы блоки не мешали читать */
+#wizVeil{position:fixed;inset:0;z-index:30;pointer-events:none;background:rgba(15,15,15,.55);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  -webkit-mask-image:linear-gradient(90deg,#000 0,#000 470px,transparent 560px);mask-image:linear-gradient(90deg,#000 0,#000 470px,transparent 560px);animation:sheet .4s ease}
+@media (max-width:980px){#wizVeil{-webkit-mask-image:linear-gradient(0deg,#000 0,#000 52%,transparent 78%);mask-image:linear-gradient(0deg,#000 0,#000 52%,transparent 78%)}}
+
+.drop{position:fixed;inset:0;z-index:60;background:rgba(251,189,3,.18);display:none;align-items:center;justify-content:center;pointer-events:none}
+.drop.show{display:flex}
+.drop div{background:var(--card);border:3px dashed var(--y);border-radius:24px;padding:40px 50px;font:750 22px var(--disp)}
+
+@media (max-width:1180px){.hb .tx{display:none}.search{width:clamp(260px,calc(100vw - 720px),640px)}#banners{width:min(560px,calc(100vw - 40px))}}
+@media (max-width:980px){
+  #menu{opacity:0;pointer-events:none;transform:translateY(10px)}
+  body.menu-open #menu{opacity:1;pointer-events:auto;transform:none;bottom:86px}
+  #menuBtn{display:grid}
+  #dl{top:auto;bottom:20px;right:20px;width:300px}
+  #wiz{left:12px;right:12px;width:auto;bottom:12px}
+  #top{left:20px}.search{width:calc(100vw - 200px)}
+  #banners{top:80px}
+}
+@media (prefers-reduced-motion:reduce){*{animation-duration:0s!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="desk"><div id="world">
+  <svg id="wires"></svg>
+
+  <section class="block" id="b-device"><div class="panel">
+    <div class="head"><div class="grow"><h2>Проверка</h2><p class="lede">Подключённый iPhone, драйвер, утилиты программы, связь с Apple — по порядку. Если что-то не работает, начни отсюда.</p></div></div>
+    <div class="tools"><button class="btn sm" onclick="loadChecks()">Перепроверить</button><button class="btn ghost sm" onclick="openFolder('logs')">Открыть журнал</button><button class="btn ghost sm" id="reloadListsBtn" onclick="reloadLists()">Обновить списки</button><button class="btn ghost sm" onclick="checkUpdates(this)">Проверить обновления</button><button class="btn tg sm" onclick="openReport()">Сообщить о проблеме</button></div>
+    <div class="scroll"><div id="devList"></div><div id="checksRes"></div><pre class="sysinfo" id="sysInfo" hidden></pre>
+      <p style="color:var(--faint);font-size:12.5px;margin:16px 0">Дима Крохобор <span id="verTxt"></span>. <span id="creditsTxt">Сделано на основе <a href="https://github.com/kda2495/IPA_Downloader" target="_blank" rel="noopener">IPA_Downloader</a> (утилиты и подборка приложений) и <a href="https://github.com/Sorvigolova/ipatool-cpp-gsa" target="_blank" rel="noopener">ipatool-cpp</a> (скачивание из App Store). Идеи — <a href="https://github.com/pdx15/ipatool-webGUI" target="_blank" rel="noopener">ipatool-webGUI</a> и <a href="https://github.com/PiloTDredd/IPA_PILOTDREDD" target="_blank" rel="noopener">IPA PILOTDREDD</a>. Установка на iPhone — <a href="https://libimobiledevice.org" target="_blank" rel="noopener">libimobiledevice</a>.</span> · <a href="#" onclick="openWizard();return false">Пройти настройку заново</a> · <a href="#" onclick="quitApp();return false">Закрыть программу</a></p></div>
+  </div></section>
+
+  <section class="block" id="b-home">
+    <div class="phone-wrap" id="phoneWrap">
+      <svg class="wifi" viewBox="0 0 120 90" aria-hidden="true"><path d="M14 38 Q60 -2 106 38"/><path d="M30 54 Q60 28 90 54"/><path d="M46 70 Q60 58 74 70"/><circle cx="60" cy="82" r="7"/></svg>
+      <button class="pgbtn l" id="pgL" hidden onclick="phonePage(-1)" aria-label="Предыдущая страница">‹</button><button class="pgbtn r" id="pgR" hidden onclick="phonePage(1)" aria-label="Следующая страница">›</button>
+      <div class="phone" id="phone"><div class="screen"><div class="island"></div>
+        <div class="scr trust" id="scrTrust"><div class="alert"><b>Доверять этому компьютеру?</b><p>Ваши настройки и данные будут доступны с этого компьютера.</p><div><span>Не доверять</span><span>Доверять</span></div></div></div>
+        <div class="scr home" id="scrHome"><div class="sbar"><span id="sbTime"></span><span id="sbBat"></span></div><div class="hpages" id="hpages"><div class="hgrid" id="hgrid"></div></div><div class="hdots" id="hdots"></div></div>
+        <div class="scr ok" id="scrOk"><div class="big"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></div><b>Готов</b><span id="scrInfo"></span></div>
+      </div></div>
+      <svg class="cable" viewBox="0 0 320 300" aria-hidden="true">
+        <path d="M160 70 C160 160, 60 170, 40 300" stroke="#0E0E0E" stroke-width="9" fill="none" stroke-linecap="round"/>
+        <path d="M160 70 C160 160, 60 170, 40 300" stroke="#2A2A2A" stroke-width="2" fill="none" stroke-linecap="round" transform="translate(-2,-1)"/>
+        <circle class="flowdot" r="6" fill="#FBBD03"><animateMotion dur="1.1s" repeatCount="indefinite" keyPoints="1;0" keyTimes="0;1" calcMode="linear" path="M160 70 C160 160, 60 170, 40 300"/></circle>
+        <g class="plug out" id="plug"><rect x="146" y="10" width="28" height="56" rx="7" fill="#151515" stroke="#333"/><rect x="153" y="0" width="14" height="14" rx="3" fill="#8a8a8a"/></g>
+      </svg>
+    </div>
+    <div class="dim" style="left:36px;top:30px;height:612px;width:1px"><i style="left:0;top:0;width:1px;height:100%"></i></div>
+    <div class="dim" style="left:6px;top:420px;transform:rotate(-90deg);transform-origin:0 0" id="dimName">iPhone не подключён</div>
+    <div class="dim" style="left:70px;top:0;width:300px;height:1px"><i style="left:0;top:0;height:1px;width:100%"></i></div>
+    <div class="dim" style="left:150px;top:-22px" id="dimIOS">iOS —</div>
+    <div class="dim" style="left:240px;top:672px;font-size:12.5px" id="dimPort">ждёт кабель</div>
+    <div class="homecol" id="homecol"></div>
+  </section>
+
+  <section class="block" id="b-catalog"><div class="panel">
+    <div class="head"><div class="grow"><h2>Российские приложения</h2><p class="lede">Банки, госсервисы, магазины — со всеми версиями, которые прячутся в App Store под другими названиями<button class="qtip" data-tip="Маскировка — сервис выпускает своё приложение под другим названием, чтобы его не удалили из App Store. Внутри то же приложение банка или магазина. В каталоге все маскировки собраны под настоящим названием.">?</button>. Каталог обновляется сам.</p></div><input class="field" id="cf" placeholder="Фильтр" style="width:190px" oninput="renderCatalogList()"></div>
+    <div class="chips" id="catChips"></div>
+    <div class="legend" id="legendC"></div>
+    <div class="scroll"><div class="cgrid" id="catGrid"><div class="empty"><span class="spin"></span> Загружаю каталог…</div></div></div>
+  </div></section>
+
+  <section class="block" id="b-purchases"><div class="panel">
+    <div class="head"><div class="grow"><h2>Мои покупки</h2><p class="lede" id="pLede">Всё, что ты когда-либо качал на этот Apple ID. Отсюда возвращаются приложения, которых в магазине уже нет.</p></div></div>
+    <div class="tools" id="pTools"></div>
+    <div class="chips" id="pTabs"></div>
+    <div class="scroll" id="pBody"></div>
+  </div></section>
+
+  <section class="block" id="b-library"><div class="panel">
+    <div class="head"><div class="grow"><h2>Библиотека</h2><p class="lede" id="libLede"></p></div><button class="btn sm" onclick="$('ipaPick').click()">Добавить свой IPA…</button><button class="btn ghost sm" onclick="openFolder('apps')">Открыть папку</button><button class="btn ghost sm" id="clearLibBtn" onclick="clearLibrary()">Очистить</button><input type="file" id="listPick" accept=".txt,text/plain" hidden onchange="checkListFile(this.files[0]);this.value=''"><input type="file" id="ipaPick" accept=".ipa" multiple hidden onchange="importFiles([...this.files]);this.value=''"></div>
+    <div class="note blue"><b>Можно поставить друзьям.</b> При первом запуске их телефон попросит пароль от твоего Apple ID — введи его сам и никому не передавай. Внутри каждого файла записана почта твоего Apple ID: давай файлы только тем, кому доверяешь, и не выкладывай их в открытый доступ.</div>
+    <div class="scroll" id="libList"></div>
+  </div></section>
+
+  <section class="block" id="b-detail" hidden><div class="panel" id="detail"></div></section>
+</div></div>
+
+<!-- ===== поверх стола ===== -->
+<div class="float" id="top">
+  <form class="search" onsubmit="event.preventDefault();doSearch()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="Найти приложение — Сбер, Т‑Банк, MAX или ссылка" autocomplete="off" aria-label="Поиск приложений"><span class="kbd" id="kbd"></span></form>
+  <button class="hb" onclick="openHelp()"><i>?</i><span class="tx">Помощь</span></button>
+  <a class="hb tgb" id="tgBtn" href="https://t.me/krohobortv" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.9 4.3 18.7 19.4c-.2 1.1-.9 1.3-1.8.8l-4.9-3.6-2.4 2.3c-.3.3-.5.5-1 .5l.3-5 9.2-8.3c.4-.4-.1-.6-.6-.2L6.1 13 1.2 11.5c-1.1-.3-1.1-1.1.2-1.6L20.5 2.6c.9-.3 1.7.2 1.4 1.7z"/></svg><span class="tx">Мой Telegram</span></a>
+  <div id="sres" hidden></div>
+</div>
+<div id="banners"></div>
+<button class="float" id="dlBtn" onclick="toggleDl()"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></span><span id="dlLbl">Загрузки</span><span class="cnt idle" id="dlCnt" hidden></span></button>
+<div class="float" id="dl" hidden></div>
+
+<nav class="float" id="menu">
+  <div class="brand"><div class="mark">К</div><div><b>Дима Крохобор</b><small>возврат приложений на iPhone</small></div></div>
+  <button class="me" id="session" onclick="openAccount()"><span class="av" id="accAv">?</span><span class="who"><b id="accName">Проверяю…</b><span id="accMail">Apple ID</span></span></button>
+  <div id="navs"></div>
+  <button class="nav allbtn" id="allBtn" onclick="showView(S.view==='all'?'home':'all')" title="Весь стол сразу. Клавиши: Esc или 0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span class="lbl"><b>Весь стол</b><span>общий план, нажми на блок</span></span></button>
+  <a class="tgline" id="tgLine" target="_blank" rel="noopener" href="https://t.me/krohobortv"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M21.9 4.3 18.7 19.4c-.2 1.1-.9 1.3-1.8.8l-4.9-3.6-2.4 2.3c-.3.3-.5.5-1 .5l.3-5 9.2-8.3c.4-.4-.1-.6-.6-.2L6.1 13 1.2 11.5c-1.1-.3-1.1-1.1.2-1.6L20.5 2.6c.9-.3 1.7.2 1.4 1.7z"/></svg>Новые маскировки — в канале</a>
+  <div class="mfoot">
+    <button class="round" id="themeBtn" onclick="toggleTheme()" title="Светлая или тёмная тема"></button>
+    <button class="round" onclick="openHelp()" title="Помощь">?</button>
+    <button class="tgl" onclick="toggleMotion()">Анимация <span class="sw" id="mSw"></span></button>
+  </div>
+  <div class="ver" id="verLbl"></div>
+</nav>
+<button class="float" id="menuBtn" onclick="document.body.classList.toggle('menu-open')" aria-label="Меню"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+
+<button class="float edge" id="eL" hidden onclick="edgeGo('L')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 5-7 7 7 7"/></svg><span></span></button>
+<button class="float edge" id="eR" hidden onclick="edgeGo('R')"><span></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg></button>
+<button class="float edge" id="eU" hidden onclick="edgeGo('U')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 15 7-7 7 7"/></svg><span></span></button>
+<button class="float edge" id="eD" hidden onclick="edgeGo('D')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 9 7 7 7-7"/></svg><span></span></button>
+<div class="float" id="toast" onclick="this.classList.remove('show')"><div class="ti" id="tIco"></div><div style="flex:1;min-width:0"><b id="tT"></b><span id="tS"></span><div class="tl"><i></i></div></div></div>
+<div id="wizVeil" hidden></div>
+<div class="float" id="wiz" hidden></div>
+<div class="float" id="tipPop" hidden></div>
+<div class="drop" id="drop"><div>Отпусти, чтобы добавить IPA в библиотеку</div></div>
+
+<div class="veil" id="askModal"><div class="sheet"><h3 id="askT"></h3><p class="lede" id="askS"></p><div class="acts2"><button class="btn ghost" onclick="closeModal('askModal')">Отмена</button><button class="btn" id="askOk"></button></div></div></div>
+<div class="veil" id="loginModal"><div class="sheet"><h3>Вход в Apple ID</h3><div id="loginBox"></div></div></div>
+<div class="veil" id="accModal"><div class="sheet"><h3 id="accTitle">Аккаунт</h3><p class="lede" id="accInfo"></p><div class="acts2"><button class="btn ghost" onclick="closeModal('accModal')">Закрыть</button><button class="btn" onclick="doLogout()">Выйти из Apple ID</button></div></div></div>
+<div class="veil" id="instModal"><div class="sheet"><h3>Куда установить?</h3><p class="lede" id="instFile"></p><div id="instList"></div><div class="acts2"><button class="btn ghost" onclick="closeModal('instModal')">Закрыть</button></div></div></div>
+<div class="veil" id="helpModal"><div class="sheet wide" id="helpBody"></div></div>
+<div class="veil" id="reportModal"><div class="sheet wide">
+  <h3>Сообщить о проблеме</h3><p class="lede">Программа собрала короткий отчёт. Пароля в нём нет, почта скрыта. Скопируй его и отправь в чат — там помогут.</p>
+  <textarea class="report" id="reportText" readonly></textarea><p class="lede" id="reportFile" style="font-size:12.5px;margin-top:8px"></p>
+  <div class="acts2"><button class="btn ghost" onclick="closeModal('reportModal')">Закрыть</button><button class="btn ghost" onclick="api('/api/show-file',{method:'POST'})">Показать полный журнал</button><button class="btn tg" onclick="sendReport()">Скопировать и открыть чат</button></div></div></div>
+<div class="veil" id="batchModal"><div class="sheet wide"><h3 id="batchT">Сохранить удалённое в библиотеку</h3><div id="batchBody"></div></div></div>
+<div class="veil" id="freshModal"><div class="sheet wide">
+  <h3>Новые маскировки</h3><p class="lede">Поставь их на iPhone из App Store, пока их не удалили, — тогда они навсегда останутся в твоих покупках, и программа сможет вернуть их в любой момент.</p>
+  <div id="freshList"></div><div class="acts2"><a class="btn tg" id="freshTg" target="_blank" rel="noopener">Подробнее в канале</a><button class="btn ghost" onclick="dismissFresh()">Понятно</button></div></div></div>
+
+<script>
+/* ================= основа ================= */
+const TOKEN = new URLSearchParams(location.search).get('t') || sessionStorage.getItem('t') || '';
+if (TOKEN) sessionStorage.setItem('t', TOKEN);
+history.replaceState(null, '', '/');
+const S = {
+  view:'home', cat:'', account:null, settings:{theme:'auto'}, os:'', chat:'', channel:'https://t.me/krohobortv', driver:'ok',
+  catalog:null, fresh:[], purchases:null, purchasesAll:false, ptab:'all', files:[], lib:{}, devices:[], devApps:null, info:{},
+  jobs:[], hidden:new Set(), seen:new Set(), detail:null, detailFrom:'home', showThanks:false, batch:null, update:null, showHist:false
+};
+const IS_MAC = /Mac/.test(navigator.platform);
+const KEY = IS_MAC ? '⌘K' : 'Ctrl K';
+const FILES_APP = () => S.os === 'darwin' ? 'Finder' : S.os === 'windows' ? 'Проводник' : 'файловый менеджер';
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const js = x => esc(JSON.stringify(x));
+const fmtSize = b => !b ? '—' : b > 1e9 ? (b/1e9).toFixed(1)+' ГБ' : Math.max(1, Math.round(b/1e6))+' МБ';
+const norm = s => String(s).toLowerCase().replace(/ё/g,'е').replace(/[^\p{L}\p{N}]/gu,'');
+const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c; };
+const verLess = (a, b) => { const pa = String(a).split('.').map(Number), pb = String(b).split('.').map(Number); for (let i = 0; i < Math.max(pa.length, pb.length); i++) { const x = pa[i]||0, y = pb[i]||0; if (x !== y) return x < y; } return false; };
+const driverOK = () => S.os !== 'windows' || S.driver === 'ok' || S.devices.length > 0;
+const tip = t => `<button class="qtip" data-tip="${esc(t)}">?</button>`;
+$('kbd').textContent = KEY;
+
+async function api(path, opts={}) {
+  opts.headers = Object.assign({'X-Token': TOKEN}, opts.headers||{});
+  if (opts.json !== undefined) { opts.body = JSON.stringify(opts.json); opts.method = opts.method||'POST'; opts.headers['Content-Type']='application/json'; }
+  const r = await fetch(path, opts);
+  let data = {}; try { data = await r.json(); } catch(e) {}
+  if (r.status === 401) throw new Error('Программа была перезапущена. Закрой эту вкладку и запусти программу ещё раз.');
+  if (!r.ok) throw new Error(data.error || ('Ошибка ' + r.status));
+  return data;
+}
+const saveSetting = obj => { Object.assign(S.settings, obj); return api('/api/settings', {json:obj}).catch(()=>{}); };
+function openModal(id){ $(id).classList.add('show'); }
+function closeModal(id){ $(id).classList.remove('show'); }
+document.querySelectorAll('.veil').forEach(m => m.addEventListener('click', e => { if (e.target === m && m.id !== 'batchModal') m.classList.remove('show'); }));
+function openFolder(which) { api('/api/open-folder?which=' + which, {method:'POST'}).catch(()=>{}); }
+
+/* ================= тема и анимация ================= */
+const MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 13A8.5 8.5 0 1 1 11 3.5a6.6 6.6 0 0 0 9.5 9.5z"/></svg>';
+const SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></svg>';
+const isDark = () => S.settings.theme !== 'light';
+function applyTheme() {
+  document.documentElement.dataset.theme = isDark() ? 'dark' : 'light';
+  try { localStorage.setItem('theme', S.settings.theme); } catch (e) {}
+  $('themeBtn').innerHTML = isDark() ? SUN : MOON;
+}
+function setTheme(t) { saveSetting({theme:t}); applyTheme(); }
+function toggleTheme() { setTheme(isDark() ? 'light' : 'dark'); }
+let motion = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+try { if (localStorage.getItem('motion') === '0') motion = false; } catch (e) {}
+$('mSw').classList.toggle('on', motion);
+function toggleMotion() { motion = !motion; $('mSw').classList.toggle('on', motion); try { localStorage.setItem('motion', motion ? '1' : '0'); } catch (e) {} }
+
+/* ================= стол и камера ================= */
+const SPEED = 1000;
+const BL = ['device','home','catalog','purchases','library','detail'];
+let pos = {}, cam = {x:0, y:0, s:1}, anim = null, wizMode = false;
+function safeArea() {
+  const W = innerWidth, H = innerHeight;
+  let left = W > 980 ? 300 : 20, right = 20;
+  if (wizMode) left = W > 980 ? 480 : 20;
+  const bottom = wizMode && W <= 980 ? 300 : 24;
+  const top = 84 + (wizMode ? 0 : ($('banners').offsetHeight ? $('banners').offsetHeight + 12 : 0));
+  return {x:left, y:top, w:Math.max(320, W - left - right), h:Math.max(300, H - top - bottom)};
+}
+function layout() {
+  const a = safeArea(), LW = Math.min(1040, Math.max(560, a.w - 40)), LH = Math.max(500, Math.min(900, a.h - 30));
+  const DW = Math.min(760, Math.max(520, a.w - 40));
+  const size = {device:[LW, LH], home:[1040, 820], catalog:[LW, LH], purchases:[LW, LH], library:[LW, LH], detail:[DW, LH]};
+  const G = 200, cw = [LW, Math.max(1040, LW), LW], rh = [LH, Math.max(820, LH), LH];
+  const cx = [240, 240 + cw[0] + G, 240 + cw[0] + G + cw[1] + G], cy = [240, 240 + rh[0] + G, 240 + rh[0] + G + rh[1] + G];
+  const cell = {device:[0,1], home:[1,1], catalog:[1,2], purchases:[1,0], library:[2,1]};
+  const slot = {catalog:[2,2], purchases:[2,0], library:[2,2], home:[0,2], device:[0,2], search:[0,2]};
+  const place = (k, r, c) => { const [w, h] = size[k]; pos[k] = {x: cx[c] + (cw[c] - w) / 2, y: cy[r] + (rh[r] - h) / 2, w, h}; };
+  for (const k in cell) place(k, ...cell[k]);
+  place('detail', ...(slot[S.detailFrom] || slot.home));
+  for (const k of BL) { const el = $('b-' + k), p = pos[k]; el.style.left = p.x + 'px'; el.style.top = p.y + 'px'; el.style.width = p.w + 'px'; el.style.height = p.h + 'px'; }
+  const W = cx[2] + cw[2] + 240, H = cy[2] + rh[2] + 240;
+  $('world').style.width = W + 'px'; $('world').style.height = H + 'px';
+  $('wires').setAttribute('width', W); $('wires').setAttribute('height', H);
+  pos.all = {x: 140, y: 140, w: W - 280, h: H - 280};
+  drawWires();
+}
+function drawWires() {
+  const h = pos.home, r = 26, on = k => S.view === k || (S.view === 'detail' && S.detailFrom === k);
+  const elbow = (x1, y1, x2, y2) => { if (Math.abs(y1 - y2) < 2) return `M${x1} ${y1}H${x2}`; const mx = (x1 + x2) / 2, s = y2 > y1 ? 1 : -1, d = x2 > x1 ? 1 : -1;
+    return `M${x1} ${y1}H${mx - r * d}Q${mx} ${y1} ${mx} ${y1 + r * s}V${y2 - r * s}Q${mx} ${y2} ${mx + r * d} ${y2}H${x2}`; };
+  const elbowV = (x1, y1, x2, y2) => { if (Math.abs(x1 - x2) < 2) return `M${x1} ${y1}V${y2}`; const my = (y1 + y2) / 2, s = x2 > x1 ? 1 : -1, d = y2 > y1 ? 1 : -1;
+    return `M${x1} ${y1}V${my - r * d}Q${x1} ${my} ${x1 + r * s} ${my}H${x2 - r * s}Q${x2} ${my} ${x2} ${my + r * d}V${y2}`; };
+  const c = pos.catalog, p = pos.purchases, d = pos.device, l = pos.library;
+  const W = [
+    ['catalog', elbow(h.x + h.w, h.y + 230, c.x, c.y + 120), [h.x + h.w, h.y + 230], [c.x, c.y + 120]],
+    ['purchases', elbow(h.x, h.y + 470, p.x + p.w, p.y + 120), [h.x, h.y + 470], [p.x + p.w, p.y + 120]],
+    ['device', elbowV(h.x + 520, h.y, d.x + d.w / 2, d.y + d.h), [h.x + 520, h.y], [d.x + d.w / 2, d.y + d.h]],
+    ['library', elbowV(h.x + 520, h.y + h.h, l.x + l.w / 2, l.y), [h.x + 520, h.y + h.h], [l.x + l.w / 2, l.y]],
+  ];
+  if (S.view === 'detail' && S.detailFrom && pos[S.detailFrom === 'search' ? 'home' : S.detailFrom]) {
+    const f = pos[S.detailFrom === 'search' ? 'home' : S.detailFrom], t = pos.detail;
+    const vertical = Math.abs((f.x + f.w / 2) - (t.x + t.w / 2)) < 40 || t.y > f.y + f.h || t.y + t.h < f.y;
+    const a = vertical ? [f.x + f.w / 2, t.y > f.y ? f.y + f.h : f.y] : [t.x > f.x ? f.x + f.w : f.x, f.y + 120];
+    const b = vertical ? [t.x + t.w / 2, t.y > f.y ? t.y : t.y + t.h] : [t.x > f.x ? t.x : t.x + t.w, t.y + 120];
+    W.push(['detail', vertical ? elbowV(a[0], a[1], b[0], b[1]) : elbow(a[0], a[1], b[0], b[1]), a, b]);
+  }
+  $('wires').innerHTML = W.map(([k, d, a, b]) => `<path d="${d}"/><circle class="dot ${on(k) || S.view === 'home' ? 'on' : ''}" cx="${a[0]}" cy="${a[1]}" r="6"/><circle class="dot ${on(k) ? 'on' : ''}" cx="${b[0]}" cy="${b[1]}" r="6"/>`).join('')
+    + `<path d="M${h.x - 70} ${h.y - 50}h40M${h.x - 70} ${h.y - 50}v40"/><path d="M${c.x + c.w + 30} ${c.y + c.h + 70}h40M${c.x + c.w + 70} ${c.y + c.h + 30}v40"/>`;
+}
+function camFor(k) {
+  const b = pos[k], a = safeArea(), pad = k === 'all' ? 0 : 40;
+  const s = Math.min(1, a.w / (b.w + pad), a.h / (b.h + pad));
+  return {s, x: a.x + a.w / 2 - (b.x + b.w / 2) * s, y: a.y + a.h / 2 - (b.y + b.h / 2) * s};
+}
+function apply() { $('world').style.transform = `translate(${cam.x}px,${cam.y}px) scale(${cam.s})`; }
+const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+function flyTo(target, ms) {
+  cancelAnimationFrame(anim);
+  if (!motion || !ms) { cam = target; apply(); return; }
+  const from = {...cam}, t0 = performance.now(), a = safeArea(), cx = a.x + a.w / 2, cy = a.y + a.h / 2;
+  const fw = [(cx - from.x) / from.s, (cy - from.y) / from.s], tw = [(cx - target.x) / target.s, (cy - target.y) / target.s];
+  const dip = Math.min(.25, Math.hypot(tw[0] - fw[0], tw[1] - fw[1]) / 7000);
+  const step = now => {
+    const t = Math.min(1, (now - t0) / ms), e = ease(t);
+    const s = (from.s + (target.s - from.s) * e) * (1 - dip * Math.sin(Math.PI * t));
+    cam = {s, x: cx - (fw[0] + (tw[0] - fw[0]) * e) * s, y: cy - (fw[1] + (tw[1] - fw[1]) * e) * s};
+    apply();
+    if (t < 1) anim = requestAnimationFrame(step); else { cam = target; apply(); }
+  };
+  anim = requestAnimationFrame(step);
+}
+function focusBlock(k, ms = SPEED) {
+  BL.forEach(b => $('b-' + b).classList.toggle('far', k === 'all' ? !wizMode : b !== k));
+  document.body.classList.toggle('overview', k === 'all' && !wizMode);
+  flyTo(camFor(k), ms);
+}
+document.querySelectorAll('.block').forEach(b => b.addEventListener('click', e => {
+  if (justDragged) { e.stopPropagation(); e.preventDefault(); return; }
+  if (!b.classList.contains('far') || wizMode) return;
+  e.stopPropagation(); e.preventDefault(); const k = b.id.slice(2); if (k !== 'detail') showView(k); else showView('detail');
+}, true));
+let rsT; addEventListener('resize', () => { clearTimeout(rsT); rsT = setTimeout(() => { layout(); flyTo(camFor(S.wiz ? wizTarget() : S.view), 0); }, 80); });
+
+/* ================= иконки и статусы ================= */
+const PALETTE = ['#3D5A80','#7A4EAB','#2A9D8F','#D1495B','#E07A1F','#3A86FF','#6A994E','#B5179E'];
+const iconSrc = (id, file, bundle) => id ? `/api/icon?id=${encodeURIComponent(id)}&t=${TOKEN}` : file ? `/api/icon?file=${encodeURIComponent(file)}&t=${TOKEN}` : bundle ? `/api/icon?bundle=${encodeURIComponent(bundle)}&t=${TOKEN}` : '';
+const colorOf = name => { let h = 0; for (const ch of String(name||'')) h = (h*31 + ch.codePointAt(0)) >>> 0; return PALETTE[h % PALETTE.length]; };
+const letterOf = name => (String(name||'?').replace(/[^\p{L}\p{N}]/gu,'')[0] || '?').toUpperCase();
+function iconHTML(id, name, opts={}) {
+  const src = iconSrc(id, opts.file);
+  return `<div class="icon ${opts.lg ? 'lg' : ''}" style="background:${colorOf(name||id)}" ${opts.dot && id ? `data-dot="${esc(id)}"` : ''}>${esc(letterOf(name))}${src ? `<img src="${src}" alt="" loading="lazy" onerror="this.remove()">` : ''}${opts.dot && id ? statusDot(id) : ''}${opts.isNew ? '<span class="nb">новое</span>' : ''}</div>`;
+}
+function statusDot(id) {
+  if (S.lib[id]) return '<i class="sd lib" title="В твоей библиотеке"></i>';
+  const inf = S.info[id]; if (!inf || !inf.known) return '';
+  return inf.inStore ? '<i class="sd live" title="Есть в App Store"></i>' : '<i class="sd gone" title="Удалено из App Store"></i>';
+}
+function statusText(id) {
+  if (S.lib[id]) return '<span class="tag">✓ В библиотеке</span>';
+  const inf = S.info[id]; if (!inf || !inf.known) return '';
+  return inf.inStore ? '<span class="tag live">Есть в App Store</span>' : `<span class="tag gone">Удалено из App Store</span>${tip('Скачать получится, только если ты ставил это приложение раньше на свой Apple ID')}`;
+}
+const legendHTML = '<span><i style="background:var(--ok)"></i>есть в App Store</span><span><i style="background:var(--y)"></i>удалено из App Store</span><span><i style="background:var(--tg)"></i>в твоей библиотеке</span>';
+async function fillInfo(ids, onProgress) {
+  const need = [...new Set(ids)].filter(id => id && !(id in S.info));
+  for (let i = 0; i < need.length; i += 100) {
+    const part = need.slice(i, i+100);
+    try { const r = await api('/api/icons?ids=' + part.join(',')); part.forEach(id => S.info[id] = r.icons[id] || {known:false}); } catch (e) { return; }
+    if (onProgress) onProgress(Math.min(i + 100, need.length), need.length);
+    document.querySelectorAll('[data-dot]').forEach(el => { if (!el.querySelector('.sd')) el.insertAdjacentHTML('beforeend', statusDot(el.dataset.dot)); });
+  }
+}
+async function loadLib() {
+  try { S.lib = (await api('/api/library-ids')).ids || {}; } catch (e) {}
+  try { S.files = (await api('/api/files')).files || []; } catch (e) {}
+}
+
+/* ================= плашки ================= */
+let tTimer;
+function toast(title, sub, opts={}) {
+  const ti = $('tIco');
+  if (opts.appId || opts.file) { ti.style.background = colorOf(opts.name || title); ti.innerHTML = esc(letterOf(opts.name || title)) + `<img src="${iconSrc(opts.appId, opts.file)}" alt="" onerror="this.remove()">`; }
+  else { ti.style.background = opts.color || 'var(--card2)'; ti.innerHTML = opts.icon || ''; }
+  $('tT').textContent = title; $('tS').textContent = sub || '';
+  const t = $('toast'); t.classList.remove('show'); void t.offsetWidth; t.classList.add('show');
+  clearTimeout(tTimer); tTimer = setTimeout(() => t.classList.remove('show'), 4000);
+}
+const ICON_OK = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+const ICON_PHONE = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#232323" stroke-width="2.2"><rect x="6.5" y="2.5" width="11" height="19" rx="3"/></svg>';
+const ICON_ERR = '<b style="color:#fff;font-size:20px">!</b>';
+
+/* ================= меню ================= */
+const MENU = [
+  ['home','Главная','с чего начать','<path d="M3.5 11 12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5"/>'],
+  ['catalog','Каталог','российские приложения','<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/>'],
+  ['purchases','Мои покупки','всё с твоего Apple ID','<path d="M6 7h12l-1 13H7z"/><path d="M9 7a3 3 0 0 1 6 0"/>'],
+  ['library','Библиотека','что ты скачал','<path d="M3.5 7a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>'],
+  ['device','Проверка','iPhone, драйвер, утилиты','<rect x="6.5" y="2.5" width="11" height="19" rx="3"/><path d="M11 18h2"/>'],
+];
+function renderMenu() {
+  const d = S.devices[0], active = S.view === 'detail' ? S.detailFrom : S.view;
+  const sub = {device: !d ? 'iPhone не подключён' : !d.trusted ? 'нажми «Доверять» на iPhone' : `iPhone готов · iOS ${esc(d.ios)}`};
+  const extra = {catalog: S.fresh.length ? `<span class="cnt new">${S.fresh.length} new</span>` : '', library: S.files.length ? `<span class="cnt">${S.files.length}</span>` : '',
+    device: `<span class="pdot ${d ? (d.trusted ? 'ok' : 'trust') : ''}"></span>`};
+  $('navs').innerHTML = MENU.map(([v, t, s, ic]) => `<button class="nav ${active === v ? 'on' : ''}" onclick="showView('${v}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ic}</svg><span class="lbl"><b>${t}</b><span>${sub[v] || s}</span></span>${extra[v] || ''}</button>`).join('');
+}
+
+/* ================= статус ================= */
+async function loadStatus() {
+  try {
+    const s = await api('/api/status');
+    S.os = s.os; S.chat = s.chat; S.channel = s.channel || S.channel; S.settings = Object.assign(S.settings, s.settings || {}); S.version = s.version; S.driver = s.driver || 'ok';
+    applyTheme();
+    $('tgBtn').href = S.channel; $('tgLine').href = S.channel; $('verLbl').textContent = 'версия ' + s.version; $('verTxt').textContent = s.version;
+    if (s.toolError) S.toolError = s.toolError;
+    S.translocated = !!s.translocated;
+    S.account = s.account || null;
+    const on = !!(S.account && S.account.loggedIn), who = on ? (S.account.name || S.account.email) : '';
+    $('session').classList.toggle('on', on);
+    $('accAv').textContent = on ? (who.trim()[0] || '✓').toUpperCase() : '?';
+    $('accName').textContent = on ? who : 'Войти в Apple ID';
+    $('accMail').textContent = on ? S.account.email : 'нужен, чтобы скачивать';
+    if (s.update && s.update.version) S.update = s.update;
+    renderBanners();
+  } catch (e) { $('accName').textContent = 'Нет связи с программой'; }
+}
+function renderBanners() {
+  let html = '';
+  if (S.translocated) html += `<div class="banner float drv" style="position:static"><span class="grow"><b>Перенеси программу в «Программы».</b> Сейчас она запущена прямо из архива или «Загрузок», и macOS держит её во временной папке — из-за этого не сработает обновление. Закрой программу, перетащи «Дима Крохобор» в папку «Программы» в Finder и запускай оттуда.</span></div>`;
+  if (S.toolError) html += `<div class="banner float note err" style="position:static">${esc(S.toolError)}</div>`;
+  if (S.update) html += `<div class="banner float" style="position:static"><span class="grow">Вышла версия <b>${esc(S.update.version)}</b>. Обнови программу, чтобы всё работало как надо.</span><a class="btn ghost sm" href="${esc(S.update.url || '#')}" target="_blank" rel="noopener">Что нового</a><button class="btn sm" onclick="doUpdate()">Обновить</button></div>`;
+  if (!driverOK() && S.settings.wizardDone) html += `<div class="banner float drv" style="position:static"><span class="grow"><b>Нужен драйвер Apple.</b> Без него Windows не видит iPhone.</span><button class="btn sm" onclick="installDriver()">Установить драйвер Apple</button></div>`;
+  if (S.fresh.length) html += `<div class="banner float" style="position:static"><span class="grow"><b>${S.fresh.length === 1 ? 'Новая маскировка' : 'Новые маскировки'}:</b> ${esc(S.fresh.slice(0, 3).map(e => e.brand + (e.store ? ' («' + e.store + '»)' : '')).join(', '))}${S.fresh.length > 3 ? ' и ещё ' + (S.fresh.length - 3) : ''}</span><button class="btn sm" onclick="openFresh()">Посмотреть</button><a class="btn tg sm" href="${esc(S.channel)}" target="_blank" rel="noopener">Подробнее в канале</a></div>`;
+  const changed = $('banners').innerHTML !== html; $('banners').innerHTML = html;
+  if (changed && pos.home && !wizMode) { layout(); flyTo(camFor(S.view), 500); renderEdges(); }
+}
+function openAccount() {
+  if (S.account && S.account.loggedIn) { $('accTitle').textContent = S.account.name || 'Аккаунт'; $('accInfo').textContent = S.account.email + (S.account.storefront ? ', регион ' + S.account.storefront : ''); openModal('accModal'); }
+  else showLogin();
+}
+
+/* ================= вход ================= */
+function loginFormHTML(p) {
+  return `<p class="lede">Нужен тот Apple ID, на котором приложения были раньше. Пароль уходит только в Apple, программа его не хранит.</p>
+  <form onsubmit="doLogin(event,'${p}')">
+    <div id="${p}Cred"><div class="fld"><label>Apple ID</label><input type="email" id="${p}Email" autocomplete="username" placeholder="почта@icloud.com" required></div>
+      <div class="fld"><label>Пароль</label><input type="password" id="${p}Pass" autocomplete="current-password" required></div></div>
+    <div class="fld" id="${p}CodeF" hidden><label>Код из уведомления на iPhone</label><input class="code-in" type="text" id="${p}Code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="••••••"></div>
+    <div id="${p}Msg"></div>
+    <div class="acts2">${p === 'm' ? '<button type="button" class="btn ghost" onclick="closeModal(\'loginModal\')">Отмена</button>' : '<button type="button" class="skip" onclick="wizNext()">Войду позже</button>'}<button class="btn" id="${p}Btn">Войти</button></div>
+  </form>`;
+}
+function showLogin() { $('loginBox').innerHTML = loginFormHTML('m'); openModal('loginModal'); setTimeout(() => $('mEmail').focus(), 50); }
+async function doLogin(e, p) {
+  e.preventDefault();
+  const btn = $(p + 'Btn'); btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Вхожу…'; $(p + 'Msg').innerHTML = '';
+  try {
+    const r = await api('/api/login', {json:{email:$(p + 'Email').value, password:$(p + 'Pass').value, code:$(p + 'Code').value}});
+    if (r.ok) { $(p + 'Pass').value = ''; await loadStatus(); if (p === 'm') { closeModal('loginModal'); renderAll(); } else wizNext(); toast('Вход выполнен', S.account && S.account.email, {icon:ICON_OK, color:'var(--ok)'}); return; }
+    if (r.needCode) { $(p + 'Cred').hidden = true; $(p + 'CodeF').hidden = false; $(p + 'Code').focus(); $(p + 'Msg').innerHTML = '<div class="note">Apple отправила код на твои устройства. Введи его, чтобы закончить вход.</div>'; btn.textContent = 'Подтвердить'; btn.disabled = false; return; }
+    $(p + 'Msg').innerHTML = '<div class="note err">' + esc(r.hint || r.error) + '</div>';
+  } catch (err) { $(p + 'Msg').innerHTML = '<div class="note err">' + esc(err.message) + '</div>'; }
+  btn.disabled = false; btn.textContent = $(p + 'CodeF').hidden ? 'Войти' : 'Подтвердить';
+}
+async function doLogout() { await api('/api/logout', {method:'POST'}).catch(()=>{}); closeModal('accModal'); S.purchases = null; await loadStatus(); renderAll(); }
+function requireLogin() { if (S.account && S.account.loggedIn) return true; showLogin(); return false; }
+
+/* ================= обновления ================= */
+async function checkUpdates(btn) {
+  if (btn) btn.textContent = 'Проверяю…';
+  try { const r = await api('/api/check-update', {method:'POST'}); if (r.latest) { if (btn) btn.textContent = 'Последняя версия ✓'; } else { S.update = r.update; renderBanners(); if (btn) btn.textContent = 'Есть обновление'; } }
+  catch (e) { if (btn) btn.textContent = 'Не удалось проверить'; }
+}
+async function doUpdate() { try { await api('/api/update', {method:'POST'}); S.update = null; renderBanners(); pollJobs(); } catch (e) { toast('Не получилось обновить', e.message, {icon:ICON_ERR, color:'var(--err)'}); } }
+
+/* ================= навигация ================= */
+function showView(v, ms) {
+  if (v === 'detail' && !S.detail) v = 'home';
+  S.view = v; document.body.classList.remove('menu-open'); if ($('tipPop')) hideTip();
+  renderMenu(); drawWires(); focusBlock(v, ms === undefined ? SPEED : ms); renderEdges();
+  if (v === 'device' && !S.checksHTML) loadChecks();
+}
+function renderAll() { renderMenu(); renderHome(); renderCatalog(); renderPurchases(); renderLibrary(); renderDevice(); if (S.detail) renderDetail(); }
+
+/* ================= Главная и живой iPhone ================= */
+function renderHome() {
+  const name = S.account && S.account.loggedIn ? (S.account.name || '').split(' ')[0] : '';
+  const libSize = S.files.reduce((s, f) => s + (f.size||0), 0);
+  const second = !driverOK() ? driverCardHTML()
+    : `<div class="tgcard"><div class="grow"><b>Новые маскировки — первыми в канале</b><span>И помощь, если что-то не работает</span></div><a href="${esc(S.channel)}" target="_blank" rel="noopener">Подписаться</a></div>`;
+  $('homecol').innerHTML = `<h1>${name ? 'Привет, ' + esc(name) + '!' : 'Привет!'}<br>Что вернём на iPhone?</h1>
+    <p class="lede" style="margin-top:10px">Ищи сверху (${KEY}) по-русски или по-английски — поиск понимает опечатки и раскладку.</p>
+    <div class="hcard statuscard"><div class="ring" id="ring"><svg viewBox="0 0 88 88"><circle class="bg" cx="44" cy="44" r="36"/><circle class="fg" cx="44" cy="44" r="36"/></svg><div class="ck"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></div></div>
+      <div class="grow"><b id="stT"></b><span id="stS"></span><div id="stB"></div></div></div>
+    ${second}
+    <div class="acts">
+      <button class="act y" onclick="$('q').focus()"><b>Найти приложение</b><span>банк, MAX, магазин или ссылка</span></button>
+      <button class="act" onclick="showView('purchases')"><b>Мои покупки</b><span>чего нет на iPhone</span></button>
+      <button class="act" onclick="startBatch()"><b>Сохранить удалённое</b><span>всё, что убрали из App Store</span></button>
+    </div>
+    <div class="statline"><span>В библиотеке: <b>${S.files.length}</b> ${plural(S.files.length,'приложение','приложения','приложений')}${libSize ? ' (' + fmtSize(libSize) + ')' : ''}</span><span>В каталоге: <b>${S.catalog ? S.catalog.brands.length : '…'}</b></span></div>`;
+  renderPhone();
+}
+function driverCardHTML() {
+  const job = S.jobs.find(j => j.title === 'Установка драйвера iPhone' && (j.status === 'running' || j.status === 'queued' || Date.now()/1000 - (j.finished||0) < 60));
+  const running = job && job.status === 'running';
+  return `<div class="hcard"><div style="display:flex;align-items:center;gap:14px"><div class="grow"><b style="font:700 18px var(--disp)">Драйвер Apple</b><div style="color:var(--muted);font-size:13px">Без него Windows не видит iPhone. Ставится один раз.</div></div>
+    <button class="btn" onclick="installDriver()" ${running ? 'disabled' : ''}>${running ? 'Устанавливаю…' : 'Установить драйвер Apple'}</button></div>
+    <div style="display:flex;align-items:center;gap:12px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);color:var(--muted);font-size:13px"><span>${job ? esc(job.status === 'error' ? (job.hint || job.result) : (job.detail || 'Запускаю…')) : 'Не установлен'}</span><div class="bar grow ${running && !(job.progress >= 0) ? 'indet' : ''}"><i style="width:${job && job.progress >= 0 ? job.progress : 0}%"></i></div></div></div>`;
+}
+let lastPhoneSt = null;
+function renderPhone() {
+  const d = S.devices[0], st = !d ? 'none' : d.trusted ? 'ok' : 'trust';
+  $('phone').classList.toggle('ok', st === 'ok'); $('phone').classList.toggle('trust', st === 'trust');
+  $('scrTrust').classList.toggle('on', st === 'trust'); $('scrOk').classList.toggle('on', st === 'ok'); $('scrHome').classList.toggle('on', st === 'ok');
+  if (st === 'ok' && lastPhoneSt !== 'ok') { $('phone').classList.add('justok'); setTimeout(() => $('phone').classList.remove('justok'), 1800); }
+  if (lastPhoneSt === 'ok' && st === 'ok') $('phone').classList.remove('justok');
+  lastPhoneSt = st; renderPhoneScreen();
+  $('plug').classList.toggle('out', st === 'none');
+  $('scrInfo').textContent = d ? `iOS ${d.ios}${d.free ? ' · свободно ' + fmtSize(d.free) : ''}` : '';
+  $('dimName').textContent = d ? d.name : 'iPhone не подключён';
+  $('dimIOS').textContent = st === 'ok' ? `iOS ${d.ios}${d.free ? ' · ' + fmtSize(d.free) + ' свободно' : ''}` : 'iOS —';
+  $('dimPort').textContent = !d ? 'ждёт кабель' : d.network ? 'по Wi‑Fi' : 'по кабелю';
+  $('phoneWrap').classList.toggle('net', !!(d && d.network));
+  const ring = $('ring'); if (!ring) return;
+  ring.className = 'ring ' + (st === 'none' ? '' : st);
+  $('stT').textContent = st === 'ok' ? d.name + ' — подключён' : st === 'trust' ? 'iPhone найден' : 'Подключи iPhone';
+  $('stS').textContent = st === 'ok' ? `iOS ${d.ios}${d.free ? ' · свободно ' + fmtSize(d.free) + ' из ' + fmtSize(d.total) : ''}` : st === 'trust' ? 'Разблокируй и нажми «Доверять» на экране телефона' : 'Кабелем к компьютеру, разблокируй экран';
+  $('stB').innerHTML = st === 'ok' ? '' : `<button class="btn ghost sm" onclick="openHelp('trust')">${st === 'trust' ? 'Не появляется «Доверять»?' : 'Как подключить'}</button>`;
+}
+let lastDevState = null;
+async function pollDevices() {
+  try { S.devices = (await api('/api/devices')).devices || []; } catch (e) { S.devices = []; }
+  const d = S.devices[0], st = !d ? 'none' : d.trusted ? 'ok' : 'trust';
+  if (lastDevState !== null && st !== lastDevState) {
+    if (st === 'trust') toast('iPhone найден', 'Нажми «Доверять» на экране телефона', {icon:ICON_PHONE, color:'var(--y)'});
+    if (st === 'ok') toast(d.name + ' подключён', 'Можно ставить приложения', {icon:ICON_OK, color:'var(--ok)'});
+    if (st === 'none') toast('iPhone отключён', '', {icon:ICON_PHONE, color:'var(--card2)'});
+  }
+  if (st === 'ok' && (lastDevState !== 'ok' || !S.devApps)) loadDevApps().then(() => { renderPhoneScreen(true); renderPurchaseList(); });
+  if (st !== 'ok') S.devApps = null;
+  lastDevState = st;
+  if (S.os === 'windows' && S.driver !== 'ok') { const was = driverOK(); await loadStatus(); if (driverOK() !== was) { renderHome(); renderDevList(); } }
+  renderBanners();
+  renderPhone(); renderMenu();
+  if (S.view === 'device') renderDevList();
+  if (S.view === 'detail') renderDetail();
+  if (S.wiz && S.wiz.step === 'iphone') renderWizard();
+}
+setInterval(() => { if (!document.hidden) pollDevices(); }, 5000);
+const readyDevice = () => S.devices.find(d => d.trusted);
+
+/* ================= экран iPhone: рабочий стол и установка ================= */
+let phoneSig = '', landedKeys = new Set(), failedKeys = new Map();
+const installJobs = () => S.jobs.filter(j => j.target && (j.status === 'running' || j.status === 'queued' || (Date.now() / 1000 - (j.finished || 0) < 3 && j.status === 'done') || failedKeys.has(j.appId || j.file)));
+const jobKey = j => j.appId || j.file || ('j' + j.id);
+function tileHTML(key, id, name, extra, file, bundle) {
+  const src = iconSrc(id, file, bundle);
+  return `<div class="tile ${extra || ''}" data-key="${esc(key)}"><div class="ti" style="background:${colorOf(name || id)}"><b>${esc(letterOf(name))}</b>${src ? `<img src="${src}" alt="" loading="lazy" onerror="this.remove()">` : ''}<div class="pie" ${extra && extra.includes('pending') ? '' : 'hidden'}><i></i></div></div><span>${esc(name || '')}</span></div>`;
+}
+function renderPhoneScreen(force) {
+  const d = readyDevice(); if (!d || !$('hgrid')) return;
+  const now = new Date(); $('sbTime').textContent = now.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
+  $('sbBat').textContent = d.free ? fmtSize(d.free) : '';
+  const pend = installJobs(), pendKeys = new Set(pend.map(jobKey));
+  const apps = (S.devApps || []).filter(a => !pendKeys.has(a.id || a.itemId));
+  // страницы по 24 иконки, как на iPhone; новые установки — на первой странице
+  const PER = 24, all = pend.map(j => ({job:j})).concat(apps.map(a => ({app:a})));
+  const pages = Math.max(1, Math.ceil(all.length / PER));
+  if (pend.length && !force) phonePg = 0;
+  phonePg = Math.min(phonePg, pages - 1);
+  const slice = all.slice(phonePg * PER, phonePg * PER + PER);
+  const shownPend = slice.filter(x => x.job).map(x => x.job), shown = slice.filter(x => x.app).map(x => x.app);
+  $('hdots').innerHTML = pages > 1 ? Array.from({length:pages}, (_, i) => `<i class="${i === phonePg ? 'on' : ''}" onclick="phonePage(${i - phonePg})"></i>`).join('') : '';
+  $('pgL').hidden = phonePg === 0; $('pgR').hidden = phonePg >= pages - 1;
+  const sig = phonePg + '|' + shown.map(a => a.id || a.bundleId).join(',') + '|' + shownPend.map(j => jobKey(j) + ':' + j.status).join(',') + '|' + [...landedKeys].join(',');
+  if (force || sig !== phoneSig) {
+    phoneSig = sig;
+    $('hgrid').innerHTML = shownPend.map(j => {
+      const k = jobKey(j), failed = j.status === 'error' || failedKeys.has(k), done = j.status === 'done';
+      return tileHTML(k, j.appId, jobName(j), failed ? 'failed' : done ? 'landed' : 'pending' + (flyingKeys.has(k) ? ' arriving' : ''), j.file);
+    }).join('') + shown.map(a => tileHTML(a.id || a.bundleId, a.id || a.itemId, a.name, landedKeys.has(a.id) ? 'landed' : '', '', a.bundleId)).join('')
+      + (!S.devApps ? '<div class="hmore">Загружаю приложения с iPhone…</div>' : '');
+  }
+  // прогресс без перерисовки
+  let installing = false;
+  for (const j of pend) {
+    const t = $('hgrid').querySelector(`.tile[data-key="${CSS.escape(jobKey(j))}"]`); if (!t || !t.classList.contains('pending')) continue;
+    const inst = /iPhone|Устанавл|Отправл|Ставлю|Распаков/i.test(j.detail || '') && j.status === 'running';
+    if (inst) installing = true;
+    t.classList.toggle('waiting', !(j.progress >= 0) || j.status === 'queued');
+    t.querySelector('.pie i').style.setProperty('--p', (j.progress >= 0 ? j.progress : 0) + '%');
+    t.querySelector('span').textContent = j.status === 'queued' ? 'Ожидание' : inst ? 'Установка…' : 'Загрузка…';
+  }
+  document.querySelector('.cable').classList.toggle('flow', installing);
+  $('phoneWrap').classList.toggle('flow', installing);
+}
+let phonePg = 0;
+function phonePage(delta) {
+  if (!delta) return;
+  const g = $('hgrid'); g.classList.add(delta > 0 ? 'out-l' : 'out-r');
+  setTimeout(() => { phonePg = Math.max(0, phonePg + delta); renderPhoneScreen(true); g.classList.remove('out-l', 'out-r'); }, 180);
+}
+// листать экран iPhone двумя пальцами или колесом
+let pgWheel = 0, pgWheelT;
+document.addEventListener('wheel', e => {
+  if (!e.target.closest('#scrHome') || !$('scrHome').classList.contains('on')) return;
+  e.preventDefault(); e.stopPropagation();
+  pgWheel += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+  clearTimeout(pgWheelT); pgWheelT = setTimeout(() => pgWheel = 0, 250);
+  if (Math.abs(pgWheel) > 80) { const dir = pgWheel > 0 ? 1 : -1; pgWheel = 0; if ((dir < 0 && phonePg > 0) || (dir > 0 && !$('pgR').hidden)) phonePage(dir); }
+}, {passive:false, capture:true});
+/* иконка вылетает из карточки и садится на экран iPhone */
+let lastSrc = null; const flyingKeys = new Set();
+document.addEventListener('pointerdown', e => {
+  const det = e.target.closest('#detail'), card = e.target.closest('.app,.row,.hrow,.brow');
+  const ic = det ? det.querySelector('.icon.lg') : card ? card.querySelector('.icon') : null;
+  lastSrc = ic ? ic.getBoundingClientRect() : null;
+}, true);
+async function startInstallFx(key, appId, name, file, quiet) {
+  if (quiet) { pollJobs(); return; }
+  const src = lastSrc; lastSrc = null;
+  if (motion && src) flyingKeys.add(key);
+  showView('home');
+  await pollJobs();
+  if (!motion || !src) return;
+  await new Promise(r => setTimeout(r, SPEED + 60));
+  renderPhoneScreen(true);
+  const tile = $('hgrid').querySelector(`.tile[data-key="${CSS.escape(key)}"] .ti`);
+  flyingKeys.delete(key);
+  if (!tile) { renderPhoneScreen(true); return; }
+  const to = tile.getBoundingClientRect();
+  const fly = document.createElement('div'); fly.className = 'flyicon';
+  fly.style.cssText += `left:${src.left}px;top:${src.top}px;width:${src.width}px;height:${src.height}px;background:${colorOf(name || appId)}`;
+  fly.innerHTML = esc(letterOf(name)) + (iconSrc(appId, file) ? `<img src="${iconSrc(appId, file)}" alt="" onerror="this.remove()">` : '');
+  document.body.appendChild(fly);
+  const dx = to.left - src.left, dy = to.top - src.top, sc = to.width / src.width;
+  const a = fly.animate([
+    {transform:'translate(0,0) scale(1)', offset:0},
+    {transform:`translate(${dx * .5}px,${Math.min(dy * .5, dy * .5 - 160)}px) scale(${(1 + sc) / 2 * 1.15}) rotate(-6deg)`, offset:.55},
+    {transform:`translate(${dx}px,${dy}px) scale(${sc})`, offset:1}], {duration:900, easing:'cubic-bezier(.45,.05,.3,1)'});
+  a.onfinish = () => { fly.remove(); renderPhoneScreen(true); const t = $('hgrid').querySelector(`.tile[data-key="${CSS.escape(key)}"]`); if (t) { t.classList.remove('arriving'); t.classList.add('landed'); setTimeout(() => t.classList.remove('landed'), 800); } };
+}
+function onInstallFinished(j) {
+  const k = jobKey(j);
+  if (j.status === 'done') {
+    if (S.devApps && j.appId && !S.devApps.some(a => (a.id || a.itemId) === j.appId)) S.devApps.unshift({id:j.appId, name:jobName(j)});
+    landedKeys.add(j.appId); setTimeout(() => { landedKeys.delete(j.appId); renderPhoneScreen(); }, 1200);
+    $('phone').classList.add('flash'); setTimeout(() => $('phone').classList.remove('flash'), 900);
+    setTimeout(() => loadDevApps().then(() => renderPhoneScreen(true)), 4000);
+  } else { failedKeys.set(k, true); setTimeout(() => { failedKeys.delete(k); renderPhoneScreen(true); }, 4000); }
+  renderPhoneScreen(true);
+}
+setInterval(() => { if (!document.hidden && $('sbTime')) $('sbTime').textContent = new Date().toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}); }, 30000);
+
+/* ================= Каталог ================= */
+async function loadCatalog() {
+  try { const c = await api('/api/catalog'); S.catalog = c; S.fresh = c.fresh || []; if (c.channel) S.channel = c.channel; }
+  catch (e) { S.catalog = {categories:[], brands:[]}; }
+  renderBanners();
+}
+const isNew = a => a.added && (Date.now() - new Date(a.added).getTime()) < 14*86400e3;
+function renderCatalog() {
+  const c = S.catalog; if (!c) return;
+  const counts = {}; c.brands.forEach(b => counts[b.category] = (counts[b.category]||0) + 1);
+  $('catChips').innerHTML = [['', 'Все', c.brands.length], ...c.categories.map(x => [x, x, counts[x]||0])].map(([k, l, n]) => `<button class="chip ${S.cat === k ? 'on' : ''}" onclick="S.cat=${js(k)};renderCatalog()">${esc(l)}<i>${n}</i></button>`).join('');
+  $('legendC').innerHTML = legendHTML;
+  renderCatalogList();
+}
+function renderCatalogList() {
+  const c = S.catalog; if (!c) return;
+  const f = norm($('cf').value || '');
+  const list = c.brands.map((b, i) => ({b, i})).filter(x => (!S.cat || x.b.category === S.cat) && (!f || norm(x.b.brand).includes(f) || x.b.apps.some(a => norm(a.name).includes(f))));
+  const shown = list.slice(0, 240); let g = '', html = '';
+  shown.forEach(({b, i}) => {
+    if (!S.cat && !f && b.category !== g) { g = b.category; html += `<div class="ghead">${esc(g)}</div>`; }
+    const first = b.apps[0], n = b.apps.length;
+    html += `<div class="app" onclick="openBrand(${i})"><div class="top">${iconHTML(first.id, b.brand, {dot:true, isNew:b.apps.some(isNew)})}<div><b>${esc(b.brand)}</b><small>${n > 1 ? `${n} ${plural(n,'версия','версии','версий')}` : first.store ? 'В App Store: «' + esc(first.store) + '»' : 'Оригинальное приложение'}</small></div></div>
+      <div class="bot">${n > 1 ? `<button class="btn ghost" onclick="event.stopPropagation();openBrand(${i})">Выбрать версию</button>` : actionBtn(first.id, first.name)}</div></div>`;
+  });
+  if (list.length > shown.length) html += `<div class="ghead">И ещё ${list.length - shown.length}. Уточни фильтр или выбери категорию.</div>`;
+  $('catGrid').innerHTML = html || '<div class="empty" style="grid-column:1/-1"><b>Ничего не нашлось</b>Попробуй поиск сверху — он понимает опечатки и раскладку.</div>';
+  fillInfo(shown.map(x => x.b.apps[0].id));
+}
+function actionBtn(id, name, sm) {
+  return S.lib[id] ? `<button class="btn ghost ${sm ? 'sm' : ''}" onclick="event.stopPropagation();quickInstall(${js(id)})">Поставить</button>`
+    : `<button class="btn ${sm ? 'sm' : ''}" onclick="event.stopPropagation();download(${js(id)}, ${js(name)})">Скачать</button>`;
+}
+function openFresh() {
+  $('freshList').innerHTML = S.fresh.map(e => `<div class="row" style="cursor:default">${iconHTML(e.id, e.brand)}<div class="nm"><b>${esc(e.brand)}</b><span>${e.store ? 'В App Store: «' + esc(e.store) + '»' : 'Оригинальное приложение'}${e.added ? ' · добавлено ' + esc(e.added.split('-').reverse().join('.')) : ''}</span></div><a class="btn sm" href="https://apps.apple.com/ru/app/id${esc(e.id)}" target="_blank" rel="noopener">Открыть в App Store</a></div>`).join('');
+  $('freshTg').href = S.channel; openModal('freshModal');
+}
+function dismissFresh() { closeModal('freshModal'); S.fresh = []; renderBanners(); renderMenu(); renderCatalogList(); api('/api/catalog-seen', {method:'POST'}).catch(()=>{}); }
+
+/* ================= Поиск: выпадающий список ================= */
+let sTimer, sSeq = 0;
+$('q').addEventListener('input', () => { clearTimeout(sTimer); const v = $('q').value.trim(); if (v.length < 2) { $('sres').hidden = true; return; } sTimer = setTimeout(doSearch, 450); });
+$('q').addEventListener('focus', () => { if ($('q').value.trim().length >= 2 && $('sres').innerHTML) $('sres').hidden = false; });
+document.addEventListener('mousedown', e => { if (!$('top').contains(e.target)) $('sres').hidden = true; });
+// сначала удалённые из App Store и маскировки — ради них и ставят программу; ниже обычные из App Store
+function renderSearchRes() {
+  const r = S.searchRes || [], box = $('sres');
+  const special = a => { const inf = S.info[a.id]; return !!a.storeAs || (inf && inf.known && !inf.inStore) || ((a.source === 'catalog' || a.source === 'list' || a.source === 'custom') && !(inf && inf.known && inf.inStore)); };
+  const row = a => `<div class="row" onclick="$('sres').hidden=true;openApp(${js(a.id)}, ${js(a.name)}, 'search')">${iconHTML(a.id, a.brand || a.name, {dot:true})}<div class="nm"><b>${esc(a.brand || a.name)}</b><span>${a.storeAs ? 'В App Store: «' + esc(a.storeAs) + '»' : a.category ? esc(a.category) : 'App Store'}</span></div>${actionBtn(a.id, a.name, true)}</div>`;
+  const g1 = r.filter(special), g2 = r.filter(a => !special(a));
+  const head = t => `<div class="shint" style="font-weight:650;color:var(--faint)">${t}</div>`;
+  box.innerHTML = (r.length ? '' : '<div class="shint">Ничего не нашлось. Попробуй другое написание или вставь ссылку из App Store: зажми иконку на iPhone → «Поделиться».</div>')
+    + (g1.length ? head('Удалённые из App Store и маскировки') + g1.map(row).join('') : '')
+    + (g2.length ? head('Есть в App Store') + g2.map(row).join('') : '')
+    + (r.length ? `<div class="shint" style="display:flex;gap:14px;flex-wrap:wrap">${legendHTML.replace(/<span>/g,'<span style="white-space:nowrap">')}</div>` : '');
+}
+async function doSearch() {
+  const q = $('q').value.trim(); if (!q) return;
+  const seq = ++sSeq, box = $('sres'); box.hidden = false;
+  box.innerHTML = '<div class="shint"><span class="spin"></span> Ищу в каталоге и App Store…</div>';
+  let r; try { r = (await api('/api/search?q=' + encodeURIComponent(q))).apps; } catch (err) { if (seq === sSeq) box.innerHTML = `<div class="note err" style="margin:6px">${esc(err.message)}</div>`; return; }
+  if (seq !== sSeq) return;
+  S.searchRes = r; renderSearchRes();
+  fillInfo(r.map(a => a.id)).then(() => { if (seq === sSeq) renderSearchRes(); });
+}
+
+/* ================= Мои покупки ================= */
+async function loadPurchases(all) {
+  if (!requireLogin()) return;
+  if (!all) {
+    S.purchasesLoading = {mode:'90'}; renderPurchases();
+    try { S.purchases = (await api('/api/purchases?all=0&refresh=1')).apps; S.purchasesAll = false; } catch (err) { S.purchasesErr = err.message; }
+    S.purchasesLoading = null; await loadDevApps(); renderPurchases();
+    if (S.purchases) { await fillInfo(S.purchases.map(a => a.id)); renderPurchaseList(); }
+    return;
+  }
+  // полная история — по годам, чтобы было видно, где идёт загрузка, и список рос на глазах
+  const now = new Date().getFullYear(), years = []; for (let y = now; y >= 2008; y--) years.push(y);
+  const L = S.purchasesLoading = {mode:'all', i:0, n:years.length, year:years[0], found:0, stop:false};
+  S.purchases = []; const seen = new Set();
+  renderPurchases();
+  for (const y of years) {
+    if (L.stop) break;
+    L.year = y; renderPurchProgress();
+    try {
+      const apps = (await api('/api/purchases?year=' + y)).apps || [];
+      for (const a of apps) if (!seen.has(a.id)) { seen.add(a.id); S.purchases.push(a); }
+    } catch (e) { L.errors = (L.errors || 0) + 1; }
+    L.i++; L.found = S.purchases.length; renderPurchProgress(); renderPurchaseList();
+  }
+  if (!L.stop && L.errors === L.n) { // по годам не вышло — пробуем одним запросом
+    L.year = 'вся история'; L.i = 0; renderPurchProgress();
+    try { S.purchases = (await api('/api/purchases?all=1&refresh=1')).apps || []; L.errors = 0; } catch (e) { S.purchasesErr = e.message; }
+  }
+  S.purchasesAll = !L.stop; S.purchasesLoading = null;
+  toast(L.stop ? 'Загрузка истории остановлена' : 'История загружена', `${S.purchases.length} ${plural(S.purchases.length,'приложение','приложения','приложений')}${L.errors ? `, не загрузились ${L.errors} ${plural(L.errors,'год','года','лет')}` : ''}`, {icon:ICON_OK, color:'var(--ok)'});
+  await loadDevApps(); renderPurchases();
+  await fillInfo(S.purchases.map(a => a.id)); renderPurchaseList();
+}
+function renderPurchProgress() {
+  const L = S.purchasesLoading, box = $('pProg'); if (!L || L.mode !== 'all' || !box) return;
+  const pct = Math.round(L.i / L.n * 100);
+  box.innerHTML = `<div class="hcard" style="margin:0 0 12px;padding:14px 16px;box-shadow:none;background:var(--card2)"><div style="display:flex;align-items:center;gap:12px"><span class="spin"></span><div class="grow"><b>Загружаю историю: ${typeof L.year === 'number' ? L.year + ' год' : L.year}</b><div style="color:var(--muted);font-size:13px">${L.i} из ${L.n} лет · найдено ${L.found} ${plural(L.found,'приложение','приложения','приложений')} — их уже можно открыть и скачать</div></div><button class="btn ghost sm" onclick="S.purchasesLoading.stop=true;this.textContent='Останавливаю…'">Остановить</button></div><div class="bar" style="margin-top:10px"><i style="width:${Math.max(3, pct)}%"></i></div></div>`;
+}
+async function loadDevApps() {
+  const d = readyDevice(); if (!d) { S.devApps = null; return; }
+  try { const r = await api('/api/device-apps?udid=' + encodeURIComponent(d.udid)); S.devApps = r.connected ? r.apps : null; } catch (e) { S.devApps = null; }
+}
+function devState(a) {
+  if (!S.devApps) return null;
+  const d = S.devApps.find(x => (x.id || x.itemId) === a.id);
+  if (!d) return {k:'missing'};
+  const inf = S.info[a.id];
+  if (inf && inf.inStore && inf.version && d.version && verLess(d.version, inf.version)) return {k:'old', v:d.version, nv:inf.version};
+  return {k:'on', v:d.version};
+}
+function renderPurchases() {
+  $('pLede').textContent = 'Всё, что ты когда-либо качал на этот Apple ID. Отсюда возвращаются приложения, которых в магазине уже нет.' + (readyDevice() ? '' : ' Подключи iPhone — увидишь, чего на нём нет.');
+  const busy = !!S.purchasesLoading;
+  $('pTools').innerHTML = `<button class="btn" onclick="loadPurchases(false)" ${busy ? 'disabled' : ''}>За 90 дней</button><button class="btn ghost" onclick="loadPurchases(true)" ${busy ? 'disabled' : ''}>Вся история</button><input class="field" id="pf" placeholder="Фильтр" oninput="renderPurchaseList()" style="flex:1;max-width:240px">${S.devApps ? '<button class="btn ghost" onclick="updateAllOld()">Обновить всё устаревшее</button>' : ''}<button class="btn ghost" onclick="$('listPick').click()" title="Файл со строками «Название: ID» — например, подборка из канала">Проверить список .txt…</button>`;
+  const tabs = S.devApps ? [['all','Все'],['missing','Нет на iPhone'],['on','На iPhone'],['old','Можно обновить'],['gone','Удалённые из App Store']] : [['all','Все'],['gone','Удалённые из App Store']];
+  $('pTabs').innerHTML = S.purchases && !(S.purchasesLoading && S.purchasesLoading.mode !== 'all') ? tabs.map(([k, l]) => `<button class="chip ${S.ptab === k ? 'on' : ''}" onclick="S.ptab='${k}';renderPurchases()">${l}</button>`).join('') : '';
+  const b = $('pBody');
+  if (S.purchasesLoading && S.purchasesLoading.mode === 'all') { b.innerHTML = '<div id="pProg"></div><div id="pList"></div>'; renderPurchProgress(); renderPurchaseList(); }
+  else if (S.purchasesLoading) b.innerHTML = '<div class="empty"><span class="spin"></span> Загружаю историю за 90 дней…</div>';
+  else if (S.purchasesErr) { b.innerHTML = `<div class="note err">${esc(S.purchasesErr)}</div>`; S.purchasesErr = null; }
+  else if (!S.purchases) b.innerHTML = `<div class="empty"><b>История пока не загружена</b>${S.account && S.account.loggedIn ? 'Нажми «За 90 дней». Полная история грузится пару минут.' : 'Сначала войди в Apple ID — слева внизу.'}</div>`;
+  else { b.innerHTML = '<div id="pList"></div>'; renderPurchaseList(); }
+}
+function renderPurchaseList() {
+  if (!$('pList') || !S.purchases) return;
+  const f = norm(($('pf')||{}).value || '');
+  const list = S.purchases.filter(a => {
+    if (f && !norm(a.name).includes(f)) return false;
+    const st = devState(a), inf = S.info[a.id];
+    if (S.ptab === 'gone') return inf && inf.known && !inf.inStore;
+    if (S.ptab === 'missing') return st && st.k === 'missing';
+    if (S.ptab === 'on') return st && st.k !== 'missing';
+    if (S.ptab === 'old') return st && st.k === 'old';
+    return true;
+  });
+  $('pList').innerHTML = list.slice(0, 300).map(a => {
+    const st = devState(a);
+    const tag = !st ? '' : st.k === 'missing' ? '<span class="tag">Нет на iPhone</span>' : st.k === 'old' ? `<span class="tag gone">На iPhone ${esc(st.v)} → ${esc(st.nv)}</span>` : '<span class="tag live">На iPhone</span>';
+    const btn = st && st.k === 'old' ? `<button class="btn sm" onclick="event.stopPropagation();download(${js(a.id)}, ${js(a.name)}, '', '', true)">Обновить</button>` : actionBtn(a.id, a.name, true);
+    return `<div class="row" onclick="openApp(${js(a.id)}, ${js(a.name)}, 'purchases')">${iconHTML(a.id, a.name, {dot:true})}<div class="nm"><b>${esc(a.name)}</b><span>${a.date ? 'Скачано ' + esc(a.date) : ''}</span></div>${tag}${btn}</div>`;
+  }).join('') || '<div class="empty"><b>Ничего</b>Поменяй фильтр или вкладку.</div>';
+  fillInfo(list.slice(0, 300).map(a => a.id));
+}
+async function updateAllOld() {
+  const old = (S.purchases || []).filter(a => { const s = devState(a); return s && s.k === 'old'; });
+  if (!old.length) return toast('Всё уже последних версий', 'Обновлять на iPhone нечего', {icon:ICON_OK, color:'var(--ok)'});
+  for (const a of old) await download(a.id, a.name, '', '', true, 'update');
+}
+
+/* ================= Библиотека ================= */
+function renderLibrary() {
+  $('libLede').textContent = `Всё скачанное лежит у тебя: «${FILES_APP()} → Документы → Дима Крохобор → Моя библиотека IPA». Файл .ipa можно перетащить прямо в окно программы.`;
+  $('libList').innerHTML = S.files.map(f => `<div class="row" onclick="${f.id ? esc(`openApp(${JSON.stringify(f.id)}, ${JSON.stringify(f.name||f.file)}, 'library')`) : ''}">${iconHTML(f.id, f.name || f.file, {file:f.file})}
+      <div class="nm"><b>${esc(f.name || f.file)} <span style="display:inline;color:var(--muted);font-weight:500">${esc(f.version || '')}</span></b><span title="${esc(f.file)}">${f.minOS ? 'нужна iOS ' + esc(f.minOS) + '+ · ' : ''}${fmtSize(f.size)}</span></div>
+      <button class="qb" title="Показать в папке" onclick="event.stopPropagation();reveal(${js(f.file)})">${SVG_FOLDER}</button><button class="qb" title="Удалить" onclick="event.stopPropagation();trashFiles([${js(f.file)}])">${SVG_TRASH}</button>
+      <button class="btn sm" onclick="event.stopPropagation();installFile(${js(f.file)}, ${js(f.name || f.file)}, ${js(f.minOS || '')}, ${js(f.id || '')})">Поставить</button></div>`).join('')
+    || '<div class="empty"><b>Библиотека пока пустая</b>Найди приложение и нажми «Скачать» — файл появится здесь и останется у тебя навсегда.</div>';
+  $('clearLibBtn').hidden = !S.files.length;
+  renderMenu();
+}
+
+/* ================= iPhone и проверка ================= */
+function renderDevice() { renderDevList(); if (S.checksHTML) { $('checksRes').innerHTML = S.checksHTML; $('sysInfo').hidden = !S.sysInfo; $('sysInfo').textContent = S.sysInfo || ''; } }
+function renderDevList() {
+  $('devList').innerHTML = (!driverOK() ? `<div class="note"><b>Нет драйвера Apple</b> — без него Windows не видит iPhone. <button class="btn sm" style="margin-left:8px" onclick="installDriver()">Установить драйвер Apple</button></div>` : '')
+    + (S.devices.map(d => `<div class="row" style="cursor:default"><div class="icon" style="background:${d.trusted ? 'var(--ok)' : 'var(--y)'}"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${d.trusted ? '#fff' : '#232323'}" stroke-width="2" stroke-linecap="round"><rect x="6.5" y="2.5" width="11" height="19" rx="3"/><path d="M10.5 5h3"/>${d.network ? '<path d="M3 9.5a6 6 0 0 1 0 5M21 9.5a6 6 0 0 0 0 5"/>' : '<path d="M12 21.5v1.5"/>'}</svg></div>
+      <div class="nm"><b>${esc(d.name)}</b><span>${d.trusted ? `iOS ${esc(d.ios)} · ${d.network ? 'по Wi‑Fi' : d.wifi ? 'по кабелю, Wi‑Fi включён' : 'по кабелю'}${d.free ? ' · свободно ' + fmtSize(d.free) + ' из ' + fmtSize(d.total) : ''}` : 'Разблокируй iPhone и нажми «Доверять» на его экране'}</span></div>
+      ${d.trusted ? '<span class="tag live">Готов к установке</span>' : '<span class="tag gone">Нужно «Доверять»</span>'}</div>${d.trusted && !d.network && !d.wifi && S.os !== 'linux' ? `<div class="note blue" style="margin:4px 0 8px"><b>Хочешь без кабеля?</b> Включи один раз синхронизацию по Wi‑Fi — и ставь приложения по воздуху. <a href="#" onclick="openHelp('wifi');return false">Как включить</a></div>` : ''}`).join('')
+    || `<div class="note blue"><b>iPhone не видно.</b> Подключи кабелем и разблокируй экран. <a href="#" onclick="openHelp('trust');return false">Не появляется «Доверять»?</a></div>`);
+}
+async function loadChecks() {
+  $('checksRes').innerHTML = '<div class="empty"><span class="spin"></span> Проверяю…</div>';
+  try {
+    const r = await api('/api/checks'); let g = '';
+    S.checksHTML = r.checks.map(c => {
+      const head = c.group !== g ? `<div class="cgroup">${esc(g = c.group)}</div>` : '';
+      const act = c.action === 'install-driver' ? '<button class="btn sm" onclick="installDriver()">Установить драйвер Apple</button>' : '';
+      return head + `<div class="check ${c.ok ? 'ok' : c.warn ? 'warn' : 'bad'}"><span class="d">${c.ok ? '✓' : '!'}</span><b>${esc(c.name)}</b><div class="s">${esc(c.info)}${c.hint ? `<div class="h">${esc(c.hint)}</div>` : ''}</div><div>${act}</div></div>`;
+    }).join('');
+    S.sysInfo = (r.system || []).join('\n');
+  } catch (err) { S.checksHTML = `<div class="note err">${esc(err.message)}</div>`; }
+  renderDevice();
+}
+async function installDriver() {
+  try { await api('/api/install-driver', {method:'POST'}); pollJobs(); } catch (e) { toast('Не получилось', e.message, {icon:ICON_ERR, color:'var(--err)'}); }
+}
+async function reloadLists() {
+  const b = $('reloadListsBtn'); b.textContent = 'Обновляю…';
+  try { const r = await api('/api/reload-lists', {method:'POST'}); b.textContent = `Каталог: ${r.catalog}, подборка: ${r.list}`; await loadCatalog(); renderCatalog(); } catch (e) { b.textContent = 'Не удалось'; }
+}
+
+/* ================= карточка приложения: камера подлетает ================= */
+function openBrand(i) { const b = S.catalog.brands[i]; S.detail = {brand:b.brand, variants:b.apps, id:b.apps[0].id, name:b.apps[0].name, store:b.apps[0].store, versions:null, verSel:'', meta:{}}; openDetail('catalog'); }
+function openApp(id, name, from) {
+  const p = /^(.*?)\s*\((.*)\)\s*$/.exec(name || '');
+  S.detail = {brand:p ? p[1] : name, variants:null, id, name, store:p && p[2] !== 'Оригинал' ? p[2] : '', versions:null, verSel:'', meta:{}};
+  openDetail(from || S.view);
+}
+function openDetail(from) {
+  S.detailFrom = from === 'detail' ? S.detailFrom : from; $('b-detail').hidden = false;
+  layout(); renderDetail(true); showView('detail');
+  fillInfo((S.detail.variants || [S.detail]).map(v => v.id)).then(() => renderDetail());
+}
+function closeDetail() { const back = S.detailFrom === 'search' ? 'home' : S.detailFrom; showView(back); }
+function pickVariant(id) { const v = S.detail.variants.find(x => x.id === id); Object.assign(S.detail, {id:v.id, name:v.name, store:v.store, versions:null, verSel:'', meta:{}}); renderDetail(true); }
+function renderDetail(scrollTop) {
+  const d = S.detail; if (!d) return;
+  const inf = S.info[d.id] || {}, dev = readyDevice(), inLib = S.lib[d.id];
+  const devOK = dev && inf.minOS && !verLess(dev.ios, inf.minOS);
+  let left = `<div class="dtop">${iconHTML(d.id, d.brand, {lg:true})}<div class="grow"><h2>${esc(d.brand)}</h2><p>${d.store ? 'В App Store: «' + esc(d.store) + '»' : 'Оригинальное приложение'} · ID ${esc(d.id)}</p>${statusText(d.id)}</div><button class="xbtn" onclick="closeDetail()" aria-label="Назад">←</button></div>
+    <div class="facts"><div class="fact"><span>В App Store</span><b>${esc(inf.version || '—')}</b></div><div class="fact"><span>Нужна iOS</span><b>${inf.minOS ? esc(inf.minOS) + '+' : '—'}</b></div><div class="fact"><span>Размер</span><b>${fmtSize(inf.size)}</b></div><div class="fact"><span>Твой iPhone</span><b>${dev ? 'iOS ' + esc(dev.ios) : 'нет'}</b></div></div>`;
+  if (d.store) left += `<div class="hintbox"><b>Это маскировка.</b> Сервис выпустил приложение под другим названием — «${esc(d.store)}», чтобы его не удалили из App Store. Внутри то же «${esc(d.brand)}».</div>`;
+  else if (inf.known && !inf.inStore) left += `<div class="hintbox"><b>Удалено из App Store.</b> Скачать получится, только если ты ставил его раньше на этот Apple ID.</div>`;
+  left += '<div class="scroll">';
+  if (d.variants && d.variants.length > 1) left += `<div class="ilabel">Версии в каталоге (${d.variants.length})</div>` + d.variants.map(v => `<div class="opt ${v.id === d.id ? 'on' : ''}" onclick="pickVariant(${js(v.id)})"><span class="radio"></span><div class="grow"><b>${v.store ? '«' + esc(v.store) + '»' : 'Оригинальное приложение'}</b><span>ID ${esc(v.id)}</span></div>${S.lib[v.id] ? '<span class="tag">✓</span>' : ''}</div>`).join('');
+  left += `<div class="ilabel">Какую версию скачать</div><div class="opt ${!d.verSel ? 'on' : ''}" onclick="S.detail.verSel='';renderDetail()"><span class="radio"></span><div class="grow"><b>Последняя${inf.version ? ' — ' + esc(inf.version) : ''}</b><span>${inf.minOS ? 'нужна iOS ' + esc(inf.minOS) + '+' : 'рекомендуется'}</span></div>${dev && inf.minOS ? `<span class="compat ${devOK ? 'ok' : 'bad'}">${devOK ? 'подходит' : 'не подойдёт'}</span>` : ''}</div>`;
+  if (!d.versions) left += `<button class="btn ghost wide" onclick="loadVersions()" id="verBtn">Показать старые версии</button>`;
+  else if (d.versions instanceof Error) left += `<div class="note err">${esc(d.versions.message)}</div>`;
+  else left += d.versions.slice().reverse().slice(0, 40).map(v => { const m = d.meta[v]; const bad = dev && m && m.minOS && verLess(dev.ios, m.minOS);
+      return `<div class="opt ${d.verSel === v ? 'on' : ''}" onclick="S.detail.verSel='${v}';renderDetail()"><span class="radio"></span><div class="grow"><b>${m ? 'Версия ' + esc(m.version || '?') : 'Сборка ' + v}</b><span>${m ? [m.releaseDate, m.minOS ? 'iOS ' + m.minOS + '+' : ''].filter(Boolean).map(esc).join(' · ') : 'загружаю данные…'}</span></div>${dev && m && m.minOS ? `<span class="compat ${bad ? 'bad' : 'ok'}">${bad ? 'не подойдёт' : 'подходит'}</span>` : ''}</div>`; }).join('');
+  left += '<div style="height:12px"></div></div>';
+  const label = d.verSel && d.meta[d.verSel] ? d.meta[d.verSel].version : '';
+  // файл уже в библиотеке — ставим из него и не перекачиваем
+  const libF = libFileFor(d.id), wantVer = d.verSel ? label : '';
+  const libFresh = libF && (!d.verSel || (label && libF.version === label)) && !(inf.inStore && inf.version && libF.version && verLess(libF.version, inf.version) && !d.verSel);
+  const newer = libF && !d.verSel && inf.inStore && inf.version && libF.version && verLess(libF.version, inf.version);
+  let side = '<div class="dside"><div id="detJob"></div>';
+  if (libF) side += `<div class="hintbox" style="margin:0"><b>✓ В библиотеке</b><br>Версия ${esc(libF.version || '?')} · ${fmtSize(libF.size)}${libF.mod ? ' · скачано ' + new Date(libF.mod * 1000).toLocaleDateString('ru-RU') : ''}
+      <div style="display:flex;gap:6px;margin-top:8px"><button class="qb" title="Показать в папке" onclick="reveal(${js(libF.file)})">${SVG_FOLDER}</button><button class="qb" title="Удалить из библиотеки" onclick="trashFiles([${js(libF.file)}])">${SVG_TRASH}</button></div></div>`;
+  if (libFresh) {
+    side += dev ? `<button class="btn wide" onclick="installFile(${js(libF.file)}, ${js(d.brand)}, ${js(libF.minOS || '')}, ${js(d.id)})">Поставить на ${esc(dev.name)}</button>`
+      : `<button class="btn wide" onclick="needPhone()">Подключи iPhone, чтобы поставить</button>`;
+    side += `<button class="btn ghost sm" style="align-self:center;margin-top:2px" onclick="download(${js(d.id)}, ${js(d.name)}, ${js(d.verSel)}, ${js(label)})">Скачать заново</button>`;
+  } else {
+    const what = newer ? `Обновить до ${esc(inf.version)}` : wantVer ? `Скачать версию ${esc(wantVer)}` : '';
+    side += dev ? `<button class="btn wide" onclick="download(${js(d.id)}, ${js(d.name)}, ${js(d.verSel)}, ${js(label)}, true)">${what ? what + ' и поставить' : 'Скачать и поставить на ' + esc(dev.name)}</button>` : '';
+    side += `<button class="btn ${dev ? 'ghost' : ''} wide" onclick="download(${js(d.id)}, ${js(d.name)}, ${js(d.verSel)}, ${js(label)})">${what ? what + ' в библиотеке' : 'Скачать в библиотеку'}</button>`;
+    if (libF && dev) side += `<button class="btn ghost sm" style="align-self:center" onclick="installFile(${js(libF.file)}, ${js(d.brand)}, ${js(libF.minOS || '')}, ${js(d.id)})">Поставить версию ${esc(libF.version || 'из библиотеки')}</button>`;
+  }
+  side += `${inf.known && inf.inStore ? `<a class="btn ghost wide" href="https://apps.apple.com/ru/app/id${esc(d.id)}" target="_blank" rel="noopener">Открыть в App Store</a>` : ''}
+    ${!dev ? '<div style="color:var(--muted);font-size:12.5px;text-align:center">Подключи iPhone кабелем, чтобы ставить сразу</div>' : ''}</div>`;
+  const keep = !scrollTop && $('detail').querySelector('.scroll') ? $('detail').querySelector('.scroll').scrollTop : 0;
+  $('detail').innerHTML = `<div class="dcols"><div style="display:flex;flex-direction:column;min-height:0">${left}</div>${side}</div>`;
+  const sc = $('detail').querySelector('.scroll'); if (sc) sc.scrollTop = keep;
+  renderDetailJobs();
+}
+async function loadVersions() {
+  if (!requireLogin()) return;
+  const d = S.detail; $('verBtn').innerHTML = '<span class="spin"></span> Получаю список версий…';
+  try { d.versions = (await api('/api/versions?id=' + d.id)).versions; } catch (e) { d.versions = e; }
+  if (S.detail !== d) return; renderDetail();
+  if (Array.isArray(d.versions)) { const ids = d.versions.slice().reverse().slice(0, 40); let i = 0;
+    const worker = async () => { while (i < ids.length && S.detail === d) { const v = ids[i++]; try { d.meta[v] = await api('/api/version?id=' + d.id + '&v=' + v); } catch (e) { d.meta[v] = {version:'?'}; } if (S.detail === d) renderDetail(); } };
+    worker(); worker(); worker(); }
+}
+function libFileFor(id) {
+  const names = S.lib[id] || []; let best = null;
+  for (const f of S.files) if (names.includes(f.file) && (!best || (f.mod || 0) > (best.mod || 0))) best = f;
+  return best;
+}
+function renderDetailJobs() {
+  const d = S.detail, box = $('detJob'); if (!d || !box) return;
+  const j = S.jobs.find(j => j.appId === d.id && (j.status === 'running' || j.status === 'queued' || (Date.now()/1000 - (j.finished||0) < 30)));
+  box.innerHTML = j ? jobCard(j) : '';
+}
+
+/* ================= действия ================= */
+async function download(id, name, versionId, versionLabel, andInstall, batch) {
+  if (!requireLogin()) return;
+  const body = {ID:id, Name:name, VersionID:versionId||'', VersionLabel:versionLabel||'', Batch:batch||''};
+  const dev = readyDevice();
+  if (andInstall) { if (!dev) { needPhone(); return; } body.Install = dev; }
+  try {
+    await api('/api/download', {json:body});
+    if (andInstall) { startInstallFx(id, id, name, '', !!batch); if (!batch) toast('Ставлю на ' + dev.name, name + ': сначала скачаю, потом отправлю на iPhone', {appId:id, name}); }
+    else { pollJobs(); toast('Скачиваю: ' + name, 'Прогресс — справа сверху', {appId:id, name}); }
+  } catch (err) { toast('Не получилось', err.message, {icon:ICON_ERR, color:'var(--err)'}); }
+}
+function needPhone() {
+  showView('home');
+  toast(S.devices.length ? 'Нажми «Доверять» на iPhone' : 'Сначала подключи iPhone', S.devices.length ? 'Разблокируй телефон — вопрос появится на экране' : 'Кабелем к компьютеру, разблокируй экран', {icon:ICON_PHONE, color:'var(--y)'});
+}
+function quickInstall(id) { const f = (S.lib[id] || [])[0]; if (!f) return; const meta = S.files.find(x => x.file === f) || {}; installFile(f, meta.name || f, meta.minOS || '', id); }
+async function installFile(file, name, minOS, id) {
+  if (!driverOK()) { showView('home'); toast('Нужен драйвер Apple', 'Кнопка установки — на Главной', {icon:ICON_PHONE, color:'var(--y)'}); return; }
+  await pollDevices();
+  const ready = S.devices.filter(d => d.trusted);
+  if (!ready.length) return needPhone();
+  if (ready.length === 1) return install(file, ready[0], minOS, name, id);
+  $('instFile').textContent = name;
+  $('instList').innerHTML = ready.map(d => `<div class="opt" onclick="closeModal('instModal');install(${js(file)}, ${js(d)}, ${js(minOS)}, ${js(name)}, ${js(id||'')})"><span class="radio"></span><div class="grow"><b>${esc(d.name)}</b><span>iOS ${esc(d.ios)}</span></div><span class="btn sm">Поставить</span></div>`).join('');
+  openModal('instModal');
+}
+async function install(file, device, minOS, name, id) {
+  if (minOS && device.ios !== '?' && verLess(device.ios, minOS) && !confirm(`Этой версии нужна iOS ${minOS}, а на ${device.name} — iOS ${device.ios}. Установка, скорее всего, не получится. Всё равно попробовать?`)) return;
+  try { await api('/api/install', {json:{file, device}}); startInstallFx(id || file, id, name || file, file); toast('Ставлю на ' + device.name, name || file, {appId:id, file, name}); } catch (err) { toast('Не получилось', err.message, {icon:ICON_ERR, color:'var(--err)'}); }
+}
+
+/* ================= «Сохранить удалённое» ================= */
+async function fetchAllPurchases(b) {
+  if (S.purchasesAll && S.purchases) return S.purchases;
+  const thisYear = new Date().getFullYear(), years = []; for (let y = 2008; y <= thisYear; y++) years.push(y);
+  b.ny = years.length; let all = [], errs = 0;
+  for (const y of years) {
+    if (b.cancelled) return null;
+    b.year = y; b.yi++; renderBatch();
+    try { all = all.concat((await api('/api/purchases?year=' + y)).apps || []); } catch (e) { errs++; }
+  }
+  if (errs === years.length) { try { all = (await api('/api/purchases?all=1&refresh=1')).apps || []; } catch (e) {} }
+  const seen = new Set(); all = all.filter(a => !seen.has(a.id) && seen.add(a.id));
+  S.purchases = all; S.purchasesAll = true; renderPurchases();
+  return all;
+}
+/* проверка списка приложений из .txt: что из него было на твоём Apple ID */
+function parseAppList(text) {
+  const out = [], seen = new Set();
+  for (const line of text.split(/\r?\n/)) {
+    const m = line.match(/id(\d{6,11})|(?:^|[^\d])(\d{6,11})(?:[^\d]|$)/); if (!m) continue;
+    const id = m[1] || m[2]; if (seen.has(id)) continue; seen.add(id);
+    let name = line.split(/[:|]/)[0].replace(/https?:\/\/\S+/g, '').trim();
+    if (!name || /^\d+$/.test(name)) name = 'ID ' + id;
+    out.push({id, name});
+  }
+  return out;
+}
+async function checkListFile(file) {
+  if (!file) return;
+  const list = parseAppList(await file.text());
+  if (!list.length) return toast('В файле нет ID приложений', 'Нужны строки вида «Название: 123456789»', {icon:ICON_ERR, color:'var(--err)'});
+  if (!requireLogin()) return;
+  S.batch = {mode:'list', file:file.name, list, stage:1, year:null, yi:0, ny:1, checked:0, total:0, items:[], sel:new Set(), cancelled:false};
+  openModal('batchModal'); renderBatch();
+  const b = S.batch, all = await fetchAllPurchases(b); if (!all) return;
+  b.stage = 2; b.total = list.length; renderBatch();
+  const owned = new Set(all.map(a => a.id));
+  await loadLib();
+  await fillInfo(list.map(a => a.id), (done, total) => { b.checked = done; b.total = total; renderBatch(); });
+  b.items = list.filter(a => owned.has(a.id));
+  b.missing = list.filter(a => !owned.has(a.id));
+  b.sel = new Set(b.items.filter(a => !S.lib[a.id]).map(a => a.id)); b.stage = 3; renderBatch();
+}
+function saveFoundList() {
+  const b = S.batch, text = b.items.map(a => `${a.name}: ${a.id}`).join('\n') + '\n';
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type:'text/plain'}));
+  a.download = (b.file || 'список').replace(/\.txt$/i, '') + ' — есть на Apple ID.txt'; a.click(); URL.revokeObjectURL(a.href);
+}
+async function startBatch() {
+  if (!requireLogin()) return;
+  const thisYear = new Date().getFullYear(), years = []; for (let y = 2008; y <= thisYear; y++) years.push(y);
+  S.batch = {stage:1, year:null, yi:0, ny:years.length, checked:0, total:0, items:[], sel:new Set(), cancelled:false};
+  openModal('batchModal'); renderBatch();
+  const b = S.batch, all = await fetchAllPurchases(b); if (!all) return;
+  b.stage = 2; b.total = all.length; renderBatch();
+  await fillInfo(all.map(a => a.id), (done, total) => { b.checked = done; b.total = total; renderBatch(); });
+  await loadLib();
+  b.items = all.filter(a => S.info[a.id] && S.info[a.id].known && !S.info[a.id].inStore && !S.lib[a.id]);
+  b.sel = new Set(b.items.map(a => a.id)); b.stage = 3; renderBatch();
+}
+function renderBatch() {
+  const b = S.batch; if (!b) return;
+  $('batchT').textContent = b.mode === 'list' ? 'Проверка списка: ' + b.file : 'Сохранить удалённое в библиотеку';
+  if (b.stage < 3) {
+    const pct = b.stage === 1 ? Math.round(b.yi / b.ny * 100) : b.total ? Math.round(b.checked / b.total * 100) : 0;
+    $('batchBody').innerHTML = `<p class="lede">${b.mode === 'list' ? `Проверяю список «${esc(b.file)}» (${b.list.length} ${plural(b.list.length,'приложение','приложения','приложений')}) по истории твоего Apple ID.` : 'Ищу в твоих покупках приложения, которых уже нет в App Store.'}</p>
+      <div class="stage ${b.stage === 1 ? 'on' : 'done'}"><span class="n">${b.stage > 1 ? '✓' : '1'}</span>Загружаю историю покупок${b.stage === 1 && b.year ? `: ${b.year} год (${b.yi} из ${b.ny})` : ''}</div>
+      <div class="stage ${b.stage === 2 ? 'on' : ''}"><span class="n">2</span>${b.mode === 'list' ? 'Сверяю список с покупками' : 'Проверяю, что удалено из App Store'}${b.stage === 2 && b.total ? `: ${b.checked} из ${b.total}` : ''}</div>
+      <div class="stage"><span class="n">3</span>Выбираешь, что скачать</div>
+      <div class="bar" style="margin-top:12px"><i style="width:${Math.max(3, pct)}%"></i></div>
+      <div class="acts2"><button class="btn ghost" onclick="S.batch.cancelled=true;closeModal('batchModal')">Отмена</button></div>`;
+    return;
+  }
+  if (b.mode === 'list') return renderListResult();
+  const unknown = (S.purchases || []).filter(a => !S.info[a.id] || !S.info[a.id].known).length;
+  if (!b.items.length && unknown) { $('batchBody').innerHTML = `<p class="lede">Не получилось спросить App Store про ${unknown} ${plural(unknown,'приложение','приложения','приложений')} — похоже, нет связи с Apple. Проверь интернет и попробуй ещё раз.</p><div class="acts2"><button class="btn ghost" onclick="closeModal('batchModal')">Закрыть</button><button class="btn" onclick="startBatch()">Попробовать снова</button></div>`; return; }
+  if (!b.items.length) { $('batchBody').innerHTML = `<p class="lede">Всё удалённое из твоих покупок уже лежит в библиотеке. Отлично!</p><div class="acts2"><button class="btn" onclick="closeModal('batchModal')">Готово</button></div>`; return; }
+  $('batchBody').innerHTML = `<p class="lede">Нашлось ${b.items.length} ${plural(b.items.length,'приложение','приложения','приложений')}, которых уже нет в App Store и ещё нет в твоей библиотеке. Сними галочки с ненужного.</p>
+    <div class="tools" style="margin:0"><button class="btn ghost sm" onclick="batchAll(true)">Выбрать всё</button><button class="btn ghost sm" onclick="batchAll(false)">Снять всё</button><input class="field" placeholder="Фильтр" oninput="batchFilter(this.value)" style="flex:1;max-width:220px"></div>
+    <div class="blist" id="blist">${b.items.map(a => `<label class="brow" data-n="${esc(norm(a.name))}"><input type="checkbox" ${b.sel.has(a.id) ? 'checked' : ''} onchange="batchToggle(${js(a.id)}, this.checked)">${iconHTML(a.id, a.name)}<div class="nm"><b>${esc(a.name)}</b><span>${a.date ? 'Скачано ' + esc(a.date) : ''}</span></div></label>`).join('')}</div>
+    <div class="acts2"><span style="color:var(--muted);margin-right:auto" id="bcount"></span><button class="btn ghost" onclick="closeModal('batchModal')">Отмена</button><button class="btn" id="batchGo" onclick="runBatch()"></button></div>`;
+  updateBatchCount();
+}
+function renderListResult() {
+  const b = S.batch;
+  const rows = b.items.map(a => `<label class="brow" data-n="${esc(norm(a.name))}"><input type="checkbox" ${b.sel.has(a.id) ? 'checked' : ''} onchange="batchToggle(${js(a.id)}, this.checked)">${iconHTML(a.id, a.name, {dot:true})}<div class="nm"><b>${esc(a.name)}</b><span>${S.lib[a.id] ? '✓ уже в библиотеке' : S.info[a.id] && S.info[a.id].known && !S.info[a.id].inStore ? 'удалено из App Store' : 'ID ' + esc(a.id)}</span></div></label>`).join('');
+  $('batchBody').innerHTML = `<p class="lede">Из <b>${b.list.length}</b> ${plural(b.list.length,'приложения','приложений','приложений')} в списке на твоём Apple ID было <b>${b.items.length}</b>.${b.items.length ? ' Их можно скачать — отметь нужные.' : ''}</p>
+    ${b.items.length ? `<div class="tools" style="margin:0"><button class="btn ghost sm" onclick="batchAll(true)">Выбрать всё</button><button class="btn ghost sm" onclick="batchAll(false)">Снять всё</button><button class="btn ghost sm" onclick="saveFoundList()">Сохранить найденные в .txt</button><input class="field" placeholder="Фильтр" oninput="batchFilter(this.value)" style="flex:1;max-width:200px"></div><div class="blist" id="blist">${rows}</div>` : '<div class="note">Ни одного приложения из этого списка на твоём Apple ID не было. Если оно ещё есть в App Store — сначала поставь его на iPhone из магазина, тогда оно появится в покупках.</div>'}
+    ${b.missing.length ? `<details style="margin-top:10px;color:var(--muted);font-size:13px"><summary style="cursor:pointer">Не было на Apple ID: ${b.missing.length}</summary><div style="margin-top:6px">${b.missing.map(a => esc(a.name)).join(', ')}</div></details>` : ''}
+    <div class="acts2"><span style="color:var(--muted);margin-right:auto" id="bcount"></span><button class="btn ghost" onclick="closeModal('batchModal')">Закрыть</button>${b.items.length ? '<button class="btn" id="batchGo" onclick="runBatch()"></button>' : ''}</div>`;
+  if (b.items.length) updateBatchCount();
+}
+function batchToggle(id, on) { on ? S.batch.sel.add(id) : S.batch.sel.delete(id); updateBatchCount(); }
+function batchAll(on) { S.batch.sel = on ? new Set(S.batch.items.map(a => a.id)) : new Set(); document.querySelectorAll('#blist input').forEach(i => i.checked = on); updateBatchCount(); }
+function batchFilter(v) { const f = norm(v); document.querySelectorAll('#blist .brow').forEach(r => r.hidden = f && !r.dataset.n.includes(f)); }
+function updateBatchCount() { const n = S.batch.sel.size; $('batchGo').textContent = `Скачать выбранные (${n})`; $('batchGo').disabled = !n; $('bcount').textContent = `Выбрано ${n} из ${S.batch.items.length}`; }
+async function runBatch() {
+  const b = S.batch, tag = 'batch-' + Date.now(), items = b.items.filter(a => b.sel.has(a.id));
+  closeModal('batchModal');
+  for (const a of items) { try { await api('/api/download', {json:{ID:a.id, Name:a.name, Batch:tag}}); } catch (e) {} }
+  toast(`Сохраняю ${items.length} ${plural(items.length,'приложение','приложения','приложений')}`, 'Общий прогресс — справа сверху', {icon:ICON_OK, color:'var(--y)'});
+  pollJobs();
+}
+async function retryFailed(tag) {
+  const failed = S.jobs.filter(j => j.batch === tag && j.status === 'error');
+  for (const j of failed) { S.hidden.add(j.id); try { await api('/api/download', {json:{ID:j.appId, Name:j.title.replace(/^Загрузка: /, ''), Batch:tag}}); } catch (e) {} }
+  pollJobs();
+}
+
+/* ================= загрузки (поверх, справа сверху) ================= */
+let pollTimer = null;
+async function pollJobs() {
+  clearTimeout(pollTimer);
+  try { S.jobs = (await api('/api/jobs')).jobs || []; } catch (e) {}
+  let libChanged = false; const primed = S.jobsPrimed;
+  S.jobs.forEach(j => {
+    if (j.status === 'running' || j.status === 'queued' || S.seen.has(j.id)) return;
+    const first = !primed; S.seen.add(j.id);
+    if (j.status === 'done' && j.kind === 'download') libChanged = true;
+    if (j.target && primed) onInstallFinished(j);
+    if (j.title === 'Установка драйвера iPhone') loadStatus().then(() => { renderHome(); renderDevList(); if (S.wiz) renderWizard(); });
+    if (first) return;
+    const nm = j.title.replace(/^(Загрузка|Установка): /, '');
+    if (j.title === 'Установка драйвера iPhone') { if (j.status === 'done') toast('Драйвер Apple установлен', 'Подключи iPhone. Если не видно — перезагрузи компьютер', {icon:ICON_OK, color:'var(--ok)'}); return; }
+    if (j.batch && j.batch.startsWith('batch-')) return;
+    if (j.status === 'done') {
+      const inst = j.kind === 'install' || /установлено/i.test(j.result || '');
+      toast(nm + (inst ? ' — установлено' : ' — скачано'), inst ? 'Ищи на экране iPhone' : 'Лежит в библиотеке, можно поставить', {appId:j.appId, name:nm});
+      if (inst && !S.settings.thanksShown) S.showThanks = true;
+    } else toast('Не получилось: ' + nm, j.hint || j.result, {icon:ICON_ERR, color:'var(--err)'});
+  });
+  S.jobsPrimed = true;
+  if (libChanged) { await loadLib(); renderLibrary(); renderCatalogList(); renderPurchaseList(); renderHome(); if (S.detail) renderDetail(); }
+  const active = S.jobs.filter(j => j.status === 'running' || j.status === 'queued').length;
+  if (active && !dlOpen && primed) { dlOpen = true; dlManual = false; }
+  if (!active && dlOpen && !dlManual && !dlCloseT) dlCloseT = setTimeout(() => { dlCloseT = null; if (!dlManual) { dlOpen = false; renderQueue(); } }, 5000);
+  if (active) { clearTimeout(dlCloseT); dlCloseT = null; }
+  renderQueue(); renderDetailJobs(); renderPhoneScreen();
+  if (!driverOK()) renderHome();
+  if (S.wiz && S.wiz.step === 'driver') renderWizard();
+  if (active) pollTimer = setTimeout(pollJobs, 700);
+}
+function jobCard(j) {
+  const failed = j.status === 'error', running = j.status === 'running', queued = j.status === 'queued', indet = !(j.progress >= 0);
+  const last = running || queued ? (j.detail || (j.log||[]).slice(-1)[0] || 'Запускаю…') : failed && j.hint ? j.hint : j.result;
+  return `<div class="job ${j.status}"><div class="t"><span class="st">${j.status === 'done' ? '✓' : failed ? '!' : ''}</span><b title="${esc(j.title)}">${esc(j.title.replace(/^Загрузка: /, ''))}</b>${running && !indet ? `<span class="pct">${Math.floor(j.progress)}%</span>` : ''}${!running && !queued ? `<button class="x" onclick="S.hidden.add(${j.id});renderQueue()" aria-label="Скрыть">×</button>` : ''}</div>
+    ${running || queued ? `<div class="bar ${indet ? 'indet' : ''}"><i style="width:${indet ? 30 : Math.max(2, j.progress)}%"></i></div>` : ''}
+    <div class="l">${esc(last)}</div>${failed && j.hint ? `<div class="tech">Ответ Apple: ${esc(j.result)}</div><button class="btn ghost sm" style="margin-top:8px" onclick="openReport()">Сообщить о проблеме</button>` : ''}</div>`;
+}
+function batchCards() {
+  const tags = [...new Set(S.jobs.filter(j => j.batch && j.batch.startsWith('batch-')).map(j => j.batch))];
+  return tags.map(tag => {
+    if (S.hidden.has(tag)) return '';
+    const list = S.jobs.filter(j => j.batch === tag), total = list.length, done = list.filter(j => j.status === 'done').length, err = list.filter(j => j.status === 'error').length, left = total - done - err;
+    return `<div class="job batch"><div class="t"><b>Сохраняю удалённое</b>${!left ? `<button class="x" onclick="S.hidden.add('${tag}');renderQueue()">×</button>` : `<span class="pct">${done + err} из ${total}</span>`}</div>
+      <div class="bar"><i style="width:${Math.max(3, (done + err) / total * 100)}%"></i></div>
+      <div class="l">Скачано ${done}${err ? `, не получилось ${err}` : ''}${left ? `, осталось ${left}` : ' — готово'}</div>
+      ${!left && err ? `<button class="btn ghost sm" style="margin-top:8px" onclick="retryFailed('${tag}')">Повторить неудачные (${err})</button>` : ''}</div>`;
+  }).join('');
+}
+/* панель загрузок: свёрнута в кнопку, раскрывается по нажатию или сама, когда что-то идёт */
+let dlOpen = false, dlManual = false, dlCloseT = null;
+function toggleDl(force) {
+  dlOpen = force === undefined ? !dlOpen : force; dlManual = dlOpen && force === undefined;
+  clearTimeout(dlCloseT); renderQueue();
+}
+document.addEventListener('mousedown', e => { if (dlOpen && !$('dl').contains(e.target) && !$('dlBtn').contains(e.target)) { dlOpen = false; renderQueue(); } });
+const jobName = j => j.name || j.title.replace(/^(Загрузка|Установка): /, '').replace(/ → .*$/, '');
+function histTitle(j) {
+  const nm = jobName(j);
+  if (j.title === 'Установка драйвера iPhone') return j.status === 'done' ? 'Драйвер Apple — установлен' : 'Драйвер Apple — не получилось';
+  if (j.title.startsWith('Обновление')) return j.title + (j.status === 'done' ? ' — готово' : ' — не получилось');
+  if (j.status === 'error') return nm + ' — не получилось';
+  if (j.target) return nm + ' → ' + j.target + ' — установлено';
+  return nm + ' — скачано';
+}
+function groupHistory(list) {
+  const out = [];
+  for (const j of list) {
+    const key = histTitle(j), last = out[out.length - 1];
+    if (last && last.key === key) { last.ids.push(j.id); continue; }
+    out.push({key, j, ids:[j.id]});
+  }
+  return out;
+}
+const fmtTime = t => { const d = new Date(t * 1000), now = new Date(); return (d.toDateString() === now.toDateString() ? '' : d.toLocaleDateString('ru-RU', {day:'2-digit', month:'2-digit'}) + ' ') + d.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}); };
+const SVG_FOLDER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg>';
+const SVG_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+const SVG_TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13"/></svg>';
+function histRow(g) {
+  const j = g.j, err = j.status === 'error', file = j.file && S.files.some(f => f.file === j.file) ? j.file : '';
+  const icon = j.title === 'Установка драйвера iPhone' ? `<div class="icon" style="background:var(--card2)">${ICON_PHONE.replace('#232323', 'currentColor')}</div>` : iconHTML(j.appId, jobName(j), {file});
+  const badge = `<i class="sb" style="background:${err ? 'var(--err)' : 'var(--ok)'}">${err ? '!' : '✓'}</i>`;
+  const qa = [
+    file && readyDevice() ? `<button class="qb" title="Поставить на ${esc(readyDevice().name)}" onclick="event.stopPropagation();installFile(${js(file)}, ${js(jobName(j))}, '', ${js(j.appId || '')})">Поставить</button>` : '',
+    file ? `<button class="qb" title="Показать в папке" onclick="event.stopPropagation();reveal(${js(file)})">${SVG_FOLDER}</button>` : '',
+    err && j.appId ? `<button class="qb" title="Повторить" onclick="event.stopPropagation();retryJob(${j.id})">Повторить</button>` : '',
+    `<button class="qb" title="Убрать из истории" onclick="event.stopPropagation();removeHist(this, ${js(g.ids)})">${SVG_X}</button>`].join('');
+  const more = err ? `<div class="more" hidden>${esc(j.hint || j.result || '')}${j.hint && j.result ? `<div class="tech">Ответ Apple: ${esc(j.result)}</div>` : ''}<div style="display:flex;gap:6px;margin-top:8px">${j.appId ? `<button class="btn sm" onclick="retryJob(${j.id})">Повторить</button>` : ''}<button class="btn ghost sm" onclick="openReport()">Сообщить о проблеме</button></div></div>` : '';
+  return `<div class="hrow" data-ids="${esc(g.ids.join(','))}"><div class="hm" onclick="histClick(this, ${js(j.appId || '')}, ${js(jobName(j))}, ${err})">${icon.replace('</div>', badge + '</div>')}<div class="tx2"><b>${esc(histTitle(j))}</b><span>${fmtTime(j.finished || j.started)}${g.ids.length > 1 ? ' · ' + g.ids.length + ' раза' : ''}${err ? ' · нажми, чтобы узнать почему' : ''}</span></div><div class="qa">${qa}</div></div>${more}</div>`;
+}
+function histClick(el, appId, name, err) {
+  if (err) { const m = el.parentElement.querySelector('.more'); if (m) { m.hidden = !m.hidden; return; } }
+  if (appId) { dlOpen = false; renderQueue(); openApp(appId, name, S.view === 'detail' ? S.detailFrom : S.view); }
+}
+async function removeHist(btn, ids) {
+  const row = btn.closest('.hrow'); row.classList.add('gone');
+  for (const id of ids) { S.hidden.add(id); api('/api/jobs-remove?id=' + id, {method:'POST'}).catch(()=>{}); }
+  setTimeout(() => { S.jobs = S.jobs.filter(j => !ids.includes(j.id)); renderQueue(); }, 260);
+}
+async function clearHist() {
+  await api('/api/jobs-remove?all=1', {method:'POST'}).catch(()=>{});
+  S.jobs = S.jobs.filter(j => j.status === 'running' || j.status === 'queued'); renderQueue();
+}
+async function retryJob(id) {
+  const j = S.jobs.find(x => x.id === id); if (!j || !j.appId) return;
+  if (j.target) { const d = readyDevice(); if (!d) return needPhone(); }
+  removeHist({closest: () => ({classList:{add(){}}})}, [id]);
+  download(j.appId, jobName(j), '', '', !!j.target, j.batch || '');
+}
+function reveal(file) { api('/api/reveal?file=' + encodeURIComponent(file), {method:'POST'}).catch(e => toast('Файл не найден', e.message, {icon:ICON_ERR, color:'var(--err)'})); }
+/* смахивание строки влево — мышкой или двумя пальцами на тачпаде */
+let swipe = null;
+document.addEventListener('pointerdown', e => { const r = e.target.closest('.hrow'); if (!r || e.target.closest('button')) return; swipe = {r, x:e.clientX, dx:0}; });
+document.addEventListener('pointermove', e => { if (!swipe) return; swipe.dx = Math.min(0, e.clientX - swipe.x); if (swipe.dx < -6) { swipe.r.style.transition = 'none'; swipe.r.style.transform = `translateX(${swipe.dx}px)`; swipe.r.style.opacity = 1 + swipe.dx / 300; } });
+document.addEventListener('pointerup', () => {
+  if (!swipe) return; const {r, dx} = swipe; swipe = null; r.style.transition = ''; r.style.opacity = '';
+  if (dx < -90) { r.style.transform = ''; removeHist(r.querySelector('.qb:last-child') || r, r.dataset.ids.split(',').map(Number)); r.dataset.swiped = '1'; }
+  else { r.style.transform = ''; if (dx < -6) r.dataset.swiped = '1'; }
+});
+document.addEventListener('click', e => { const r = e.target.closest('.hrow'); if (r && r.dataset.swiped) { e.stopPropagation(); e.preventDefault(); delete r.dataset.swiped; } }, true);
+const wheelSw = new WeakMap();
+document.addEventListener('wheel', e => {
+  const r = e.target.closest('.hrow'); if (!r || Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+  e.preventDefault(); const v = Math.min(0, (wheelSw.get(r) || 0) - e.deltaX); wheelSw.set(r, v);
+  r.style.transition = 'none'; r.style.transform = `translateX(${v}px)`;
+  clearTimeout(r._wt); r._wt = setTimeout(() => { r.style.transition = ''; if (v < -90) removeHist(r, r.dataset.ids.split(',').map(Number)); else r.style.transform = ''; wheelSw.set(r, 0); }, 140);
+}, {passive:false});
+
+function renderQueue() {
+  const inBatch = j => j.batch && j.batch.startsWith('batch-');
+  const active = S.jobs.filter(j => (j.status === 'running' || j.status === 'queued') && !(inBatch(j) && j.status === 'queued'));
+  const n = S.jobs.filter(j => j.status === 'running' || j.status === 'queued').length;
+  const hist = S.jobs.filter(j => (j.status === 'done' || j.status === 'error') && !S.hidden.has(j.id) && !(inBatch(j) && j.status === 'done'));
+  // кнопка
+  $('dlBtn').querySelector('.ico').innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>' + (n ? '<i class="ring2"></i>' : '');
+  $('dlLbl').textContent = n ? (active[0] && active[0].progress >= 0 ? `${jobName(active[0])} · ${Math.floor(active[0].progress)}%` : 'Идёт загрузка') : 'Загрузки';
+  const c = $('dlCnt'); c.hidden = !(n || hist.length); c.textContent = n || hist.length; c.classList.toggle("idle", !n);
+  // панель
+  $('dl').hidden = !dlOpen;
+  if (!dlOpen) return;
+  const thanks = S.showThanks ? `<div class="job tgc"><div class="t"><b>Получилось!</b><button class="x" onclick="closeThanks()">×</button></div><div class="l">Новые маскировки и инструкции, как их вернуть, выходят в канале «Дима Крохобор».</div><a class="btn sm" style="margin-top:9px;background:#fff;color:#1679AD" href="${esc(S.channel)}" target="_blank" rel="noopener" onclick="closeThanks()">Подписаться</a></div>` : '';
+  const groups = groupHistory(hist).slice(0, 40);
+  $('dl').innerHTML = `<div class="dh"><b>Загрузки и установка</b>${hist.length ? '<button class="lnk" onclick="clearHist()">Очистить историю</button>' : ''}<button class="xbtn" style="width:30px;height:30px;font-size:15px" onclick="toggleDl(false)" aria-label="Закрыть">×</button></div>`
+    + thanks + batchCards() + active.map(jobCard).join('')
+    + (groups.length ? `<div class="hlabel">История</div>` + groups.map(histRow).join('') + '<div class="hint2">Нажми на строку — откроется приложение. Смахни влево, чтобы убрать.</div>'
+      : (!active.length ? '<div class="empty" style="padding:24px 8px"><b>Пока пусто</b>Здесь появятся загрузки и установки.</div>' : ''));
+}
+function closeThanks() { S.showThanks = false; saveSetting({thanksShown:true}); renderQueue(); }
+
+/* ================= перетаскивание IPA ================= */
+let dragDepth = 0;
+addEventListener('dragenter', e => { if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) { dragDepth++; $('drop').classList.add('show'); } });
+addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; $('drop').classList.remove('show'); } });
+addEventListener('dragover', e => e.preventDefault());
+addEventListener('drop', e => {
+  e.preventDefault(); dragDepth = 0; $('drop').classList.remove('show');
+  if (wizMode) return;
+  importFiles([...(e.dataTransfer.files || [])]);
+});
+async function importFiles(all) {
+  const files = all.filter(f => /\.ipa$/i.test(f.name));
+  if (!files.length) return toast('Это не IPA', 'Нужен файл с расширением .ipa', {icon:ICON_ERR, color:'var(--err)'});
+  for (const f of files) {
+    toast('Добавляю ' + f.name, 'Проверяю файл…', {icon:'<span class="spin"></span>', color:'var(--card2)'});
+    try { const r = await fetch('/api/import?name=' + encodeURIComponent(f.name), {method:'POST', headers:{'X-Token':TOKEN}, body:f}); const d = await r.json(); if (!r.ok) throw new Error(d.error); toast(d.name || f.name, 'Добавлено в библиотеку — можно ставить на iPhone', {file:d.file, name:d.name}); }
+    catch (err) { toast('Не получилось: ' + f.name, err.message, {icon:ICON_ERR, color:'var(--err)'}); }
+  }
+  await loadLib(); renderLibrary(); showView('library');
+}
+function askConfirm(title, sub, okLabel, fn) {
+  $('askT').textContent = title; $('askS').textContent = sub; $('askOk').textContent = okLabel;
+  $('askOk').onclick = () => { closeModal('askModal'); fn(); };
+  openModal('askModal');
+}
+const TRASH_NAME = () => S.os === 'windows' ? 'Корзину' : S.os === 'darwin' ? 'Корзину' : 'корзину';
+function trashFiles(files, all) {
+  const list = S.files.filter(f => files.includes(f.file)), size = list.reduce((a, f) => a + (f.size || 0), 0);
+  const title = all ? `Очистить библиотеку?` : list.length === 1 ? `Удалить «${list[0].name || list[0].file}»?` : `Удалить ${list.length} ${plural(list.length,'файл','файла','файлов')}?`;
+  askConfirm(title, `${all ? `${list.length} ${plural(list.length,'файл','файла','файлов')}, ` : ''}освободится ${fmtSize(size)}. Файлы уйдут в ${TRASH_NAME()} — их можно будет вернуть оттуда, пока Корзина не очищена.`, all ? 'Очистить' : 'Удалить', async () => {
+    try {
+      const r = await api('/api/trash', {json:{Files:files}});
+      if (r.moved) toast(r.moved === 1 ? 'Файл в Корзине' : `${r.moved} ${plural(r.moved,'файл','файла','файлов')} в Корзине`, 'Освободилось ' + fmtSize(size), {icon:SVG_TRASH.replace('currentColor','#fff'), color:'var(--card2)'});
+      if (r.error) toast('Не всё получилось удалить', r.error, {icon:ICON_ERR, color:'var(--err)'});
+    } catch (e) { toast('Не получилось удалить', e.message, {icon:ICON_ERR, color:'var(--err)'}); }
+    await loadLib(); renderLibrary(); renderHome(); renderCatalogList(); renderPurchaseList(); if (S.detail) renderDetail(); renderQueue();
+  });
+}
+function clearLibrary() { if (S.files.length) trashFiles(S.files.map(f => f.file), true); }
+
+/* ================= помощь ================= */
+const FAQ = () => [
+  ['connect', 'Как подключить iPhone к компьютеру?', `<ol><li>Подключи iPhone кабелем, который передаёт данные (лучше оригинальный, без переходников и хабов).</li><li>Разблокируй iPhone и не блокируй экран.</li><li>На iPhone появится «Доверять этому компьютеру?» — нажми «Доверять» и введи код-пароль.</li><li>Телефон на Главной загорится зелёным.</li></ol>`],
+  ['trust', 'Не появляется «Доверять этому компьютеру»', `<ol>${S.os === 'windows' ? '<li><b>Проверь драйвер Apple</b> — без него вопрос не появится никогда. Кнопка установки — на Главной и в разделе «Проверка».</li>' : ''}${S.os === 'darwin' ? '<li>Если Mac спрашивает «Разрешить подключение аксессуара?» — нажми «Разрешить».</li>' : ''}<li>Переподключи кабель, попробуй другой USB-порт и другой кабель — многие дешёвые кабели только заряжают.</li><li>Разблокируй iPhone <b>до</b> подключения и держи экран включённым.</li><li>Если когда-то нажал «Не доверять» — сбрось: «Настройки → Основные → Перенос или сброс iPhone → Сброс → Сбросить геонастройки и настройки конфиденциальности». Данные не удалятся.</li><li>Перезагрузи iPhone и компьютер.</li>${S.os === 'windows' ? '<li>В Parallels при подключении iPhone выбери «Подключить к Windows».</li>' : ''}${S.os === 'linux' ? '<li>Проверь, что запущена служба usbmuxd.</li>' : ''}</ol>`],
+  ['wifi', 'Как ставить без кабеля, по Wi‑Fi', `${S.os === 'linux' ? '<b>На Linux так не работает</b> — только по кабелю.' : `Один раз подключи iPhone кабелем и включи синхронизацию по Wi‑Fi:<ol>${S.os === 'windows' ? '<li>Открой приложение «Устройства Apple» (или iTunes) и выбери свой iPhone.</li><li>На вкладке «Основные» («Обзор» в iTunes) поставь галочку про синхронизацию с iPhone по Wi‑Fi.</li><li>Нажми «Применить».</li>' : '<li>Открой Finder и выбери свой iPhone в боковой панели.</li><li>На вкладке «Основные» поставь галочку «Показывать этот iPhone, если он подключён к Wi‑Fi».</li><li>Нажми «Применить».</li>'}<li>Отключи кабель. Пока iPhone и компьютер в одной сети Wi‑Fi, программа видит телефон — над ним появятся жёлтые волны.</li></ol><b>Учти:</b> по Wi‑Fi большие приложения ставятся медленнее. Если телефон пропал — разблокируй его, он появится снова.`}`],
+  ['notbought', 'Пишет, что приложение не покупалось', 'Apple отдаёт только то, что когда-то было на твоём Apple ID. Проверь «Мои покупки» — если приложения там нет, войди в другой свой Apple ID, где оно было. Если приложение ещё есть в App Store, сначала поставь его на iPhone из магазина.'],
+  ['crash', 'Приложение сразу закрывается после установки', 'Открой App Store на iPhone, войди в тот же Apple ID, с которого скачано приложение, и установи любое бесплатное приложение. После этого запусти проблемное приложение снова.'],
+  ['code', 'Не приходит код подтверждения', 'Чаще всего неверный пароль — проверь его, войдя на icloud.com. Код приходит на твои устройства Apple. Если Apple временно заблокировала аккаунт после нескольких попыток — разблокируй его на iforgot.apple.com.'],
+  ['friends', 'Можно ли поставить приложение другу?', 'Да. При первом запуске телефон друга попросит пароль от твоего Apple ID — введи его сам. Внутри файла записана почта твоего Apple ID, поэтому давай файлы только тем, кому доверяешь.'],
+  ['files', 'Где лежат скачанные файлы?', `В «${FILES_APP()} → Документы → Дима Крохобор → Моя библиотека IPA». Кнопка «Открыть папку» есть в разделе «Библиотека».`],
+  ['old', 'Приложение не ставится — нужна iOS новее', 'Открой приложение и нажми «Показать старые версии»: у каждой видно, подойдёт ли она к iOS твоего iPhone. Скачай подходящую.'],
+];
+function openHelp(open) {
+  const tips = S.os === 'windows' ? 'Windows: если при запуске появилось синее окно — «Подробнее» → «Выполнить в любом случае».' : S.os === 'darwin' ? 'Mac: если macOS не даёт открыть программу — правый клик → «Открыть» или «Системные настройки» → «Конфиденциальность и безопасность» → «Всё равно открыть».' : '';
+  $('helpBody').innerHTML = `<div style="display:flex;align-items:center;gap:10px"><h3 style="flex:1">Как пользоваться</h3><button class="xbtn" onclick="closeModal('helpModal')" aria-label="Закрыть">×</button></div>
+    <ol class="steps"><li><b>Войди в Apple ID</b><span>Слева внизу.</span></li><li><b>Найди приложение</b><span>Поиск (${KEY}), каталог или покупки.</span></li><li><b>Выбери версию</b><span>Видно, подойдёт ли к твоей iOS.</span></li><li><b>Подключи iPhone</b><span>Кабелем, «Доверять».</span></li><li><b>Скачай и поставь</b><span>Одной кнопкой.</span></li></ol>
+    ${tips ? `<p class="lede" style="font-size:13px">${tips}</p>` : ''}
+    <h3 style="font-size:17px;margin-top:14px">Частые вопросы</h3>
+    <div class="faq">${FAQ().map(([k, q, a]) => `<details ${open === k ? 'open' : ''}><summary>${esc(q)}</summary><div class="a">${a}</div></details>`).join('')}</div>
+    <p style="color:var(--faint);font-size:12.5px;margin:14px 0 0">${$('creditsTxt') ? $('creditsTxt').innerHTML : ''}</p>
+    <div class="acts2" style="justify-content:flex-start"><button class="btn" onclick="closeModal('helpModal');openWizard()">Пройти настройку заново</button><button class="btn ghost" onclick="closeModal('helpModal');showView('device')">Проверить всё</button><button class="btn tg" onclick="closeModal('helpModal');openReport()">Не помогло — написать в чат</button></div>`;
+  openModal('helpModal');
+}
+async function openReport() {
+  $('reportText').value = 'Собираю отчёт…'; $('reportFile').textContent = ''; openModal('reportModal');
+  try { const r = await api('/api/report', {method:'POST'}); $('reportText').value = r.summary; $('reportFile').textContent = 'Полный журнал сохранён: ' + r.file + '. Пришли его, если в чате попросят подробности.'; S.chat = r.chat || S.chat; }
+  catch (err) { $('reportText').value = err.message; }
+}
+async function sendReport() {
+  try { await navigator.clipboard.writeText($('reportText').value); } catch (e) { $('reportText').select(); document.execCommand('copy'); }
+  window.open(S.chat || S.channel, '_blank', 'noopener');
+}
+async function quitApp() {
+  if (!confirm('Закрыть программу? Текущие загрузки продолжатся при следующем запуске.')) return;
+  await api('/api/quit', {method:'POST'}).catch(()=>{});
+  document.body.innerHTML = '<div class="empty" style="padding-top:30vh"><b>Программа закрыта</b>Эту вкладку можно закрыть.</div>';
+}
+
+/* ================= первый запуск: камера ведёт по столу ================= */
+function wizSteps() { return S.os === 'windows' ? ['hello','driver','login','iphone','done'] : S.os === 'darwin' ? ['hello','login','iphone','done'] : ['hello','usbmux','login','iphone','done']; }
+function wizTarget() { const st = S.wiz && S.wiz.step; return st === 'hello' ? 'all' : st === 'login' ? 'home' : st === 'done' ? 'catalog' : 'home'; }
+function openWizard() {
+  S.wiz = {i:0, step:wizSteps()[0]}; wizMode = true; document.body.classList.add('wizard');
+  $('wiz').hidden = false; $('wizVeil').hidden = false; layout(); renderWizard(); focusBlock('all', 0);
+}
+function wizGo(i) { const st = wizSteps(); S.wiz.i = Math.max(0, Math.min(i, st.length - 1)); S.wiz.step = st[S.wiz.i]; renderWizard(); const t = wizTarget(); BL.forEach(b => $('b-' + b).classList.toggle('far', t !== 'all' && b !== t)); flyTo(camFor(t), SPEED); }
+function wizNext() { wizGo(S.wiz.i + 1); }
+function wizBack() { wizGo(S.wiz.i - 1); }
+function wizClose() {
+  $('wiz').hidden = true; $('wizVeil').hidden = true; S.wiz = null; wizMode = false; document.body.classList.remove('wizard');
+  saveSetting({wizardDone:true, guideSeen:true, wizardVer:2}); layout(); renderBanners(); renderAll(); showView('home');
+}
+function renderWizard() {
+  const w = S.wiz; if (!w) return;
+  const st = wizSteps(), dev = S.devices[0];
+  const top = `<div class="wsteps">${st.map((_, i) => `<i class="${i <= w.i ? 'on' : ''}"></i>`).join('')}</div>`;
+  const back = w.i > 0 ? '<button class="btn ghost" onclick="wizBack()">Назад</button>' : '';
+  let body = '', nav = '';
+  if (w.step === 'hello') {
+    body = `<h3>Привет! Это твой рабочий стол</h3><p class="lede">Здесь всё для возврата приложений на iPhone: каталог российских приложений, твои покупки, библиотека и сам iPhone в центре. ${S.os === 'windows' ? 'Сейчас за пару минут настроим всё, что нужно.' : 'Настройка займёт минуту.'}</p>
+      ${(S.os === 'windows' ? [['Драйвер Apple','чтобы Windows видела iPhone'],['Apple ID','тот, где были приложения'],['iPhone','кабелем и «Доверять»']] : S.os === 'darwin' ? [['Apple ID','тот, где были приложения'],['iPhone','кабелем и «Доверять»'],['Доступ к аксессуару','если Mac спросит — «Разрешить»']] : [['usbmuxd','служба для работы с iPhone'],['Apple ID','тот, где были приложения'],['iPhone','кабелем и «Доверять»']]).map(([t, d], i) => `<div class="bigstat"><div class="d">${i + 1}</div><div><b>${t}</b><span>${d}</span></div></div>`).join('')}
+      <div class="tgcard" style="margin:0"><div class="grow"><b>Канал «Дима Крохобор»</b><span>Новые маскировки и помощь, если что-то не работает</span></div><a href="${esc(S.channel)}" target="_blank" rel="noopener">Подписаться</a></div>`;
+    nav = '<span class="grow"></span><button class="btn lg" onclick="wizNext()">Начать</button>';
+  } else if (w.step === 'driver') {
+    const job = S.jobs.find(j => j.title === 'Установка драйвера iPhone' && (j.status === 'running' || j.status === 'queued' || Date.now()/1000 - (j.finished||0) < 60));
+    const ok = driverOK(), running = job && job.status === 'running';
+    body = `<h3>Драйвер Apple</h3><p class="lede">Без него Windows не видит iPhone, и ставить приложения не получится. Ставится один раз, только драйвер — без iTunes.</p>
+      <div class="bigstat ${ok ? 'ok' : job && job.status !== 'error' ? 'wait' : 'bad'}"><div class="d">${ok ? '✓' : '!'}</div><div class="grow"><b>${ok ? 'Драйвер установлен и работает' : job ? (job.status === 'error' ? 'Не получилось' : 'Устанавливаю…') : 'Драйвер не установлен'}</b><span>${ok ? 'Можно идти дальше.' : job ? esc(job.status === 'error' ? (job.hint || job.result) : (job.detail || '')) : 'Программа скачает его с сайта Apple.'}</span>
+        ${running ? `<div class="bar ${job.progress >= 0 ? '' : 'indet'}" style="margin-top:8px"><i style="width:${job.progress >= 0 ? job.progress : 30}%"></i></div>` : ''}</div></div>
+      ${!ok ? `<button class="btn wide" onclick="installDriver()" ${running ? 'disabled' : ''}>Установить драйвер Apple</button>
+      <p class="lede" style="font-size:13px;margin-top:10px">Windows спросит разрешение — нажми «Да». Около 200 МБ с сайта Apple. Не получается? Поставь <a href="https://apps.microsoft.com/search?query=Apple%20Devices" target="_blank" rel="noopener">«Устройства Apple» из Microsoft Store</a> или <a href="https://www.apple.com/itunes/download/win64" target="_blank" rel="noopener">iTunes</a> — драйвер ставится вместе с ними. <a href="#" onclick="loadStatus().then(renderWizard);return false">Проверить ещё раз</a></p>` : ''}`;
+    nav = back + `<span class="grow"></span>${!ok ? '<button class="skip" onclick="wizNext()">Пропустить</button>' : ''}<button class="btn" onclick="wizNext()" ${ok ? '' : 'disabled'}>Дальше</button>`;
+  } else if (w.step === 'usbmux') {
+    body = `<h3>Служба usbmuxd</h3><p class="lede">На Linux для работы с iPhone нужна служба usbmuxd: <code>sudo apt install usbmuxd</code> или аналог для твоего дистрибутива.</p>`;
+    nav = back + '<span class="grow"></span><button class="btn" onclick="wizNext()">Дальше</button>';
+  } else if (w.step === 'login') {
+    const on = S.account && S.account.loggedIn;
+    body = `<h3>Вход в Apple ID</h3>` + (on ? `<div class="bigstat ok"><div class="d">✓</div><div><b>${esc(S.account.name || S.account.email)}</b><span>${esc(S.account.email)} — вход выполнен</span></div></div>` : loginFormHTML('w'));
+    nav = on ? back + '<span class="grow"></span><button class="btn" onclick="wizNext()">Дальше</button>' : back;
+  } else if (w.step === 'iphone') {
+    const state = !dev ? 'wait' : !dev.trusted ? 'trust' : 'ok';
+    body = `<h3>Подключи iPhone</h3><p class="lede">Кабелем к компьютеру, разблокируй экран и нажми «Доверять». Телефон на столе загорится зелёным.${S.os === 'darwin' ? ' Если Mac спросит «Разрешить подключение аксессуара?» — нажми «Разрешить».' : S.os === 'windows' && !driverOK() ? ' Сначала нужен драйвер Apple — вернись на шаг назад.' : ''}</p>
+      <div class="bigstat ${state === 'ok' ? 'ok' : 'wait'}"><div class="d">${state === 'ok' ? '✓' : '<span class="spin"></span>'}</div><div><b>${state === 'ok' ? esc(dev.name) + ' — подключён' : state === 'trust' ? 'Нажми «Доверять» на экране iPhone' : 'Жду iPhone…'}</b><span>${state === 'ok' ? 'iOS ' + esc(dev.ios) : state === 'trust' ? 'Разблокируй телефон — вопрос появится на экране' : 'Подключи кабелем и разблокируй экран'}</span></div></div>
+      <div class="faq">${FAQ().filter(f => f[0] === 'trust').map(([k, q, a]) => `<details><summary>${esc(q)}</summary><div class="a">${a}</div></details>`).join('')}</div>`;
+    nav = back + `<span class="grow"></span>${state !== 'ok' ? '<button class="skip" onclick="wizNext()">Подключу потом</button>' : ''}<button class="btn" onclick="wizNext()" ${state === 'ok' ? '' : 'disabled'}>Дальше</button>`;
+  } else {
+    const items = [[S.account && S.account.loggedIn, 'Apple ID', S.account && S.account.loggedIn ? S.account.email : 'войти можно слева внизу']];
+    if (S.os === 'windows') items.push([driverOK(), 'Драйвер Apple', driverOK() ? 'работает' : 'кнопка будет на Главной']);
+    items.push([!!readyDevice(), 'iPhone', readyDevice() ? readyDevice().name : 'подключишь, когда будешь ставить']);
+    body = `<h3>Готово!</h3><p class="lede">Справа — каталог российских приложений. Поиск — ${KEY}.</p>
+      ${items.map(([ok, t, s]) => `<div class="bigstat ${ok ? 'ok' : 'wait'}"><div class="d">${ok ? '✓' : '!'}</div><div><b>${t}</b><span>${esc(s)}</span></div></div>`).join('')}
+      <div class="note blue" style="margin-top:10px"><b>Совет:</b> нажми на Главной «Сохранить удалённое» — программа найдёт в покупках всё, что уже убрали из App Store, и сохранит в библиотеку.</div>`;
+    nav = back + '<span class="grow"></span><button class="btn" onclick="wizClose()">Начать пользоваться</button>';
+  }
+  $('wiz').innerHTML = top + body + `<div class="wnav">${nav}</div>`;
+}
+
+/* ================= стрелки, перетаскивание и магнит ================= */
+const NEIGH = {home:{L:'purchases', R:'catalog', U:'device', D:'library'}, purchases:{R:'home'}, catalog:{L:'home'}, device:{D:'home'}, library:{U:'home'}};
+const NAMES = {home:'Главная', catalog:'Каталог', purchases:'Мои покупки', library:'Библиотека', device:'Проверка'};
+function renderEdges() {
+  const n = S.view === 'detail' ? {} : (NEIGH[S.view] || {});
+  $('allBtn').classList.toggle('on', S.view === 'all');
+  $('eU').style.top = safeArea().y + 'px';
+  for (const d of ['L','R','U','D']) { const b = $('e' + d); b.hidden = !n[d]; if (n[d]) { b.querySelector('span').textContent = NAMES[n[d]]; b.title = `Перейти: «${NAMES[n[d]]}». Можно и стрелкой ${{L:'←', R:'→', U:'↑', D:'↓'}[d]} на клавиатуре`; } }
+}
+function edgeGo(d) { const to = (NEIGH[S.view] || {})[d]; if (to) showView(to); }
+function magnet(ms) {
+  const a = safeArea(), cx = a.x + a.w / 2, cy = a.y + a.h / 2;
+  let best = null, bd = Infinity;
+  for (const k of ['home','catalog','purchases','library','device'].concat(S.detail ? ['detail'] : [])) {
+    const p = pos[k], x = cam.x + (p.x + p.w / 2) * cam.s, y = cam.y + (p.y + p.h / 2) * cam.s, d = Math.hypot(x - cx, y - cy);
+    if (d < bd) { bd = d; best = k; }
+  }
+  showView(best, ms);
+}
+let drag = null, justDragged = false;
+$('desk').addEventListener('pointerdown', e => {
+  if (e.button !== 0 || wizMode) return;
+  const blk = e.target.closest('.block'); if (blk && !blk.classList.contains('far')) return;
+  cancelAnimationFrame(anim);
+  drag = {x:e.clientX, y:e.clientY, cx:cam.x, cy:cam.y, moved:false, id:e.pointerId};
+});
+addEventListener('pointermove', e => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  if (!drag.moved && Math.hypot(dx, dy) < 5) return;
+  if (!drag.moved) { drag.moved = true; $('desk').classList.add('dragging'); try { $('desk').setPointerCapture(drag.id); } catch (err) {} }
+  cam.x = drag.cx + dx; cam.y = drag.cy + dy; apply();
+});
+addEventListener('pointerup', () => {
+  if (!drag) return;
+  const moved = drag.moved; drag = null; $('desk').classList.remove('dragging');
+  if (moved) { justDragged = true; setTimeout(() => justDragged = false, 50); magnet(600); }
+});
+let wheelT;
+$('desk').addEventListener('wheel', e => {
+  if (wizMode || e.ctrlKey) return;
+  const blk = e.target.closest('.block'); if (blk && !blk.classList.contains('far')) return;
+  e.preventDefault(); cancelAnimationFrame(anim);
+  cam.x -= e.deltaX; cam.y -= e.deltaY; apply();
+  clearTimeout(wheelT); wheelT = setTimeout(() => magnet(600), 220);
+}, {passive:false});
+
+/* ================= подсказки «?» ================= */
+function hideTip() { $('tipPop').hidden = true; document.querySelectorAll('.qtip.on').forEach(q => q.classList.remove('on')); }
+document.addEventListener('click', e => {
+  const q = e.target.closest('.qtip');
+  if (!q) { if (!e.target.closest('#tipPop')) hideTip(); return; }
+  e.preventDefault(); e.stopPropagation();
+  if (q.classList.contains('on')) return hideTip();
+  hideTip(); q.classList.add('on');
+  const p = $('tipPop'); p.textContent = q.dataset.tip; p.hidden = false;
+  const r = q.getBoundingClientRect(), w = p.offsetWidth, h = p.offsetHeight;
+  p.style.left = Math.max(12, Math.min(innerWidth - w - 12, r.left + r.width / 2 - w / 2)) + 'px';
+  p.style.top = (r.bottom + 10 + h > innerHeight ? r.top - h - 10 : r.bottom + 10) + 'px';
+}, true);
+addEventListener('keydown', e => { if (e.key === 'Escape') hideTip(); });
+
+/* ================= клавиатура ================= */
+addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); $('q').focus(); $('q').select(); return; }
+  if (e.key === 'Escape') { if (dlOpen) { toggleDl(false); return; } document.querySelectorAll('.veil.show').forEach(m => m.classList.remove('show')); $('sres').hidden = true; document.body.classList.remove('menu-open'); if (S.view === 'detail') closeDetail(); else if (!S.wiz && S.view !== 'all') showView('all'); return; }
+  if (['INPUT','TEXTAREA'].includes(document.activeElement.tagName) || document.querySelector('.veil.show') || S.wiz) return;
+  const dir = {ArrowRight:'R', ArrowLeft:'L', ArrowUp:'U', ArrowDown:'D'}[e.key];
+  if (e.key === '0') { e.preventDefault(); showView(S.view === 'all' ? 'home' : 'all'); return; }
+  if (dir && S.view !== 'detail' && NEIGH[S.view] && NEIGH[S.view][dir]) { e.preventDefault(); edgeGo(dir); }
+});
+
+/* ================= старт: облёт стола ================= */
+(async () => {
+  applyTheme(); layout(); renderMenu(); renderQueue();
+  BL.forEach(b => $('b-' + b).classList.add('far'));
+  cam = camFor('all'); apply();
+  await loadStatus();
+  renderHome();
+  await Promise.all([loadCatalog(), loadLib(), pollDevices()]);
+  renderAll(); pollJobs();
+  if (!S.settings.wizardDone || (S.settings.wizardVer || 0) < 2) openWizard();
+  else setTimeout(() => showView('home'), 350);
+})();
+</script>
+</body>
+</html>
