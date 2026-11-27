@@ -279,6 +279,8 @@ type LoginResult struct {
 }
 
 func (t *Tools) Login(ctx context.Context, email, password, code string) LoginResult {
+	addSecret(password)
+	defer dropSecret(password)
 	var out string
 	// На macOS и Linux пароль передаём через псевдотерминал — он не виден в списке процессов.
 	// На Windows псевдотерминала нет, поэтому как в IPA_Downloader: параметром -p.

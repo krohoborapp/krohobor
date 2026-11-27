@@ -49,9 +49,41 @@ var (
 	logDir  string
 )
 
+// scrubEcho убирает из журнала строку, которую терминал повторил при вводе пароля: в старых версиях
+// она записывалась прямо перед «Enter password:». Это и есть пароль — его в журнале быть не должно.
+func scrubEcho(lines []string) []string {
+	out := lines[:0:0]
+	for i, l := range lines {
+		if i+1 < len(lines) && strings.Contains(lines[i+1], "Enter password:") && echoLine.MatchString(l) {
+			continue
+		}
+		out = append(out, l)
+	}
+	return out
+}
+
+var echoLine = regexp.MustCompile(`^\d\d:\d\d:\d\d {3}\S+$`)
+
+// scrubOldLogs один раз чистит уже записанные журналы от повторённых паролей.
+func scrubOldLogs(dir string) {
+	files, _ := filepath.Glob(filepath.Join(dir, "dimakrohobor-*.log"))
+	for _, f := range files {
+		data, err := os.ReadFile(f)
+		if err != nil || !strings.Contains(string(data), "Enter password:") {
+			continue
+		}
+		lines := strings.Split(string(data), "\n")
+		clean := scrubEcho(lines)
+		if len(clean) != len(lines) {
+			_ = os.WriteFile(f, []byte(strings.Join(clean, "\n")), 0o644)
+		}
+	}
+}
+
 func initLog(dir string) {
 	logDir = dir
 	_ = os.MkdirAll(dir, 0o755)
+	scrubOldLogs(dir)
 	// храним последние 7 файлов журнала
 	if files, _ := filepath.Glob(filepath.Join(dir, "dimakrohobor-*.log")); len(files) > 6 {
 		sort.Strings(files)
@@ -71,8 +103,39 @@ var (
 	reHome     = regexp.MustCompile(`(?i)(/Users/|/home/|\\Users\\)[^/\\\s]+`)
 )
 
+// Пароль и код на время входа: терминал повторяет введённое, и эта строка не должна попасть в журнал.
+var (
+	secretMu sync.Mutex
+	secrets  []string
+)
+
+func addSecret(v string) {
+	if len(v) < 3 {
+		return
+	}
+	secretMu.Lock()
+	secrets = append(secrets, v)
+	secretMu.Unlock()
+}
+
+func dropSecret(v string) {
+	secretMu.Lock()
+	defer secretMu.Unlock()
+	for i, x := range secrets {
+		if x == v {
+			secrets = append(secrets[:i], secrets[i+1:]...)
+			return
+		}
+	}
+}
+
 // mask убирает из текста личное: пароли, коды, почту, имя пользователя в путях.
 func mask(s string) string {
+	secretMu.Lock()
+	for _, v := range secrets {
+		s = strings.ReplaceAll(s, v, "•••")
+	}
+	secretMu.Unlock()
 	s = reSecret.ReplaceAllString(s, "${1}***")
 	s = reEmailAny.ReplaceAllString(s, "${1}***@${2}")
 	s = reHome.ReplaceAllString(s, "${1}…")
@@ -99,7 +162,7 @@ func logTail(n int) []string {
 	if err != nil {
 		return nil
 	}
-	lines := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
+	lines := scrubEcho(strings.Split(strings.TrimRight(string(data), "\n"), "\n"))
 	if len(lines) > n {
 		lines = lines[len(lines)-n:]
 	}

@@ -73,6 +73,8 @@ func interactiveLoginSupported() bool {
 
 // LoginStart начинает вход. Если Apple просит код — возвращает NeedCode и открытую сессию.
 func (t *Tools) LoginStart(email, password string) (*loginSession, LoginResult) {
+	addSecret(password) // до конца входа: терминал может повторить пароль в выводе
+	go func() { time.Sleep(7 * time.Minute); dropSecret(password) }()
 	wbin, wargs := ttyWrap(t.Ipatool, []string{"auth", "login", "-e", email})
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute) // на ввод кода — с запасом
 	cmd := t.command(ctx, "", wbin, wargs...)
